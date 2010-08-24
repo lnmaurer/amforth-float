@@ -188,7 +188,7 @@ true not constant false
 \ THE FOLLOWING FUNCTIONS MANIPULATE THAT PAIR
 
 \ performs a 'right shift' on a float split in to an d and n
-\ d is shifted right (halved) and n is incriment
+\ d is shifted right (halved) and n is incrimented
 : frshift ( d-significand n-exponent -- d n )
   1+ >r d2/ r> ;
 
@@ -200,7 +200,6 @@ true not constant false
 : flshift ( d-significand n-exponent -- d n )
   1- >r d2* r> ;
 
-\ check behavior is n-times is 0
 : flshiftn ( d-significand n-exponent n-times -- d n )
   dup 0> if 0 do flshift loop else drop then ;
 
@@ -254,7 +253,7 @@ true not constant false
 : f0= ( f -- flag )
   fsignificand d0=  ;
 
-\ works because 0 is postive for doubless
+\ works because 0 is postive for doubles
 : f0< ( f -- flag)
   fsignificand d0< ;
 
@@ -264,9 +263,9 @@ true not constant false
 : fabs ( f -- |f| )
   fdup f0< if fnegate then ;
 
-\ NOTE: might run in to trouble is subtracting two numbers that are close in
+\ NOTE: might run in to trouble subtracting two numbers that are close in
 \ magnitude. We shift 6 extra spaces to the left before adding to get some
-\ additional significant digits, but it might not be enough in some cases
+\ additional significant digits, have to think about this more
 \ THE PLAN: break both in to d n pairs, find the larger of the two exponents,
 \ and align the both pairs to that exponent minus 6 (see above). Once aligned,
 \ we can just add the significands then make the resulting float from the d n
@@ -286,12 +285,12 @@ true not constant false
 : fmax ( f1 f2 -- f )
   fover fover f- f0<
   if fswap then
-  drop ;
+  fdrop ;
 
 : fmin ( f1 f2 -- f )
   fover fover f- f0< not
   if fswap then
-  drop ;
+  fdrop ;
 
 \ CONVERSION
 
