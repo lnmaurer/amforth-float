@@ -212,6 +212,14 @@ true not constant false
     flshiftn
   then ;
 
+\ shifts out all trailing zeros
+: fremovetrailing ( d n -- d n )
+  begin
+    nfover ( really ndover ) drop 1 and 0=
+  while
+    frshift
+  repeat ;
+
 : sigexp>f ( d-significand n-exponent -- f )
   \ the plan is to first make the signficand positive and then shift it so that
   \ it has a one in the 24th place (and handle the exponent accordingly) then
@@ -233,7 +241,7 @@ true not constant false
   \ otherwise zero would make it lshift forever 
   \ this also does some errorchecking
   begin
-    nfover ( really dfover ) 0 128 d< ( d n flag )
+    nfover ( really ndover ) 0 128 d< ( d n flag )
     over -127 > and
   while
     flshift
