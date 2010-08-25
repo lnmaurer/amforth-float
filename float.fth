@@ -46,11 +46,13 @@
 
 \ STACK MANIPULATION WORDS
 
+\ DOESN'T WORK?
 : f>r ( f -- , R: -- f )
-    swap >r >r ;
+    >r >r ;
 
+\ DOESN'T WORK?
 : fr> ( -- f, R: f -- )
-    r> r> swap ;
+    r> r> ;
 
 : fdrop ( f -- )
  drop drop ;
@@ -231,36 +233,41 @@ true not constant false
   repeat ;
 
 : sigexp>f ( d-significand n-exponent -- f )
+  nfover ( ndover ) d0=
+  if \ take care of zero seperately
+    drop fdrop f0
+  else \ nonzero
   \ the plan is to first make the signficand positive and then shift it so that
   \ it has a one in the 24th place (and handle the exponent accordingly) then
   \ take care of the sign and stick the significand and exponent together to
   \ make a float
   
-  \ take off sign
-  nfswap ( ndswap ) dnegateifneg >r fnswap ( d n, R: flag )
+    \ take off sign
+    nfswap ( ndswap ) dnegateifneg >r fnswap ( d n, R: flag )
 
-  \ if it's too large, shift it right
-  begin
-    nfover ( really dfover ) 0 128 d>
-  while
-    frshift
-  repeat
+    \ if it's too large, shift it right
+    begin
+      nfover ( really dfover ) 0 128 d>
+    while
+      frshift
+    repeat
 
-  \ if it's too small, shift it left
-  \ however, make sure to keep the exponent >=-127
-  \ otherwise zero would make it lshift forever 
-  \ this also does some errorchecking
-  begin
-    nfover ( really ndover ) 0 128 d< ( d n flag )
-    over -127 > and
-  while
-    flshift
-  repeat
+    \ if it's too small, shift it left
+    \ however, make sure to keep the exponent >=-127
+    \ otherwise zero would make it lshift forever 
+    \ this also does some errorchecking
+    begin
+      nfover ( really ndover ) 0 128 d< ( d n flag )
+      over -127 > and
+    while
+      flshift
+    repeat
 
-  \ restore sign
-  r> swap >r if dnegate then ( d, R: n )
+    \ restore sign
+    r> swap >r if dnegate then ( d, R: n )
 
-  fmakesignificand r> fsetexponent ;
+    fmakesignificand r> fsetexponent
+  then ;
 
 : f>sigexp ( f -- d-significand n-exponent )
   fdup fexponent >r fsignificand r> ;
@@ -302,11 +309,12 @@ true not constant false
   f>sigexp r> + >r ( d2 d1, R: exp )
   dsplit fswap dsplit ( n1u n1l n2u n2l, R: exp )
   fover fover ( n1u n1l n2u n2l n1u n1l n2u n2l , R: exp )
-  rot m* i 24 - sigexp>f r> nfswap f>r >f ( n1u n1l n2u n2l n1u n2u, R: fll exp )
-  m* i sigexp>f r> nfswap f>r >f ( n1u n1l n2u n2l, R: fll fuu exp )
+  rot m* i 24 - sigexp>f r> nfswap >r >r >r
+  ( n1u n1l n2u n2l n1u n2u, R: fll exp )
+  m* i sigexp>f r> nfswap >r >r >r ( n1u n1l n2u n2l, R: fll fuu exp )
   rot rot ( n1u n2l n1l n2u, R: fll fuu exp )
-  m* i 12 - sigexp>f r> nfswap f>r >f ( n1u n2l, R: fll fuu flu exp )
-  m* r> 12 - sigexp>f fr> fr> fr> ( ful flu fuu fll )
+  m* i 12 - sigexp>f r> nfswap >r >r >r ( n1u n2l, R: fll fuu flu exp )
+  m* r> 12 - sigexp>f r> r> r> r> r> r> ( ful flu fuu fll )
   frot f+ frot f+ f+ ; \ want to add fll in first and fuu in last
 
 : f< ( f1 f2 -- flag )
