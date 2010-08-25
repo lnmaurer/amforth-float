@@ -22,7 +22,7 @@ see http://lars.nocrew.org/dpans/dpans12.htm
 >FLOAT
 D>F yes
 F! yes
-F*
+F* yes
 F+ yes
 F- yes
 F/

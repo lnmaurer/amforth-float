@@ -15,7 +15,7 @@
 \ >FLOAT
 \ D>F yes
 \ F! yes
-\ F*
+\ F* yes
 \ F+ yes
 \ F- yes
 \ F/
@@ -43,6 +43,13 @@
 \ FSWAP yes
 \ FVARIABLE yes
 \ REPRESENT
+
+\ MISC
+
+true not constant false
+
+\ return +0
+0 0 fconstant f0
 
 \ STACK MANIPULATION WORDS
 
@@ -117,24 +124,19 @@
 : d0< ( d -- flag )
   nip 0< ;
 
-\ splits a 24 bit double (e.g. the significand) in to two 12 bit singles --
-\ an upper and a lower (nU, nL) keeping the signs
-: dsplit ( d -- nU nL )
-  fdup 12 0 do d2/ loop d>s nfswap
-  20 0 do d2* loop
-  20 0 do d2/ loop d>s ;
-
-\ MISC
-
-true not constant false
-
 \ negates d if it's negative and returns a flag saying whether it was negated
 \ or not
 : dnegateifneg ( d -- d flag )
   fdup ( ddup ) d0< if dnegate true else false then ;
 
-\ return +0 MAKE THIS A FCONSTANT?
-0 0 fconstant f0
+\ splits a 24 bit double (e.g. the significand) in to two 12 bit singles --
+\ an upper and a lower (nU, nL) keeping the signs
+: dsplit ( d -- nU nL )
+  \ get the upper half by just shifting it 12 times to the right
+  fdup 12 0 do d2/ loop d>s nfswap
+  \ get the lower half using a mask and keeping track of the sign
+  dnegateifneg >r drop 4095 and
+  r> if negate then ;
 
 \ HELPER WORDS FOR SEPERATING OUT AND PUTTING BACK TOGETHER THE DIFFERENT
 \ PARTS OF FLOATS
@@ -254,8 +256,7 @@ true not constant false
 
     \ if it's too small, shift it left
     \ however, make sure to keep the exponent >=-127
-    \ otherwise zero would make it lshift forever 
-    \ this also does some errorchecking
+    \ to allow for subnormal numbers
     begin
       nfover ( really ndover ) 0 128 d< ( d n flag )
       over -127 > and
@@ -304,18 +305,25 @@ true not constant false
 : f- ( f1 f2 -- f1-f2 )
   fnegate f+ ;
 
+\ The basic idea is to break the significand of each float in to two 12bit
+\ pieces. These are nice to work with, because we can use m* to multiply them
+\ in to 24bit significands, turn them in to floats, and add them all up.
+\ The exponents for the different parts have to be taken in to account -- they
+\ differ by 12. When adding up at the end, we sum from smallest to largest to
+\ collect as many significant figures as we can. The actual implimentation is
+\ kind of messy, but here goes...
 : f* ( f1 f2 -- f1*f2 )
   f>sigexp >r fswap ( d2 f1, R: n2 )
   f>sigexp r> + >r ( d2 d1, R: exp )
   dsplit fswap dsplit ( n1u n1l n2u n2l, R: exp )
   fover fover ( n1u n1l n2u n2l n1u n1l n2u n2l , R: exp )
-  rot m* i 24 - sigexp>f r> nfswap >r >r >r
+  rot m* i 23 - sigexp>f r> nfswap >r >r >r
   ( n1u n1l n2u n2l n1u n2u, R: fll exp )
-  m* i sigexp>f r> nfswap >r >r >r ( n1u n1l n2u n2l, R: fll fuu exp )
+  m* i 1+ sigexp>f r> nfswap >r >r >r ( n1u n1l n2u n2l, R: fll fuu exp )
   rot rot ( n1u n2l n1l n2u, R: fll fuu exp )
-  m* i 12 - sigexp>f r> nfswap >r >r >r ( n1u n2l, R: fll fuu flu exp )
-  m* r> 12 - sigexp>f r> r> r> r> r> r> ( ful flu fuu fll )
-  frot f+ frot f+ f+ ; \ want to add fll in first and fuu in last
+  m* i 11 - sigexp>f r> nfswap >r >r >r ( n1u n2l, R: fll fuu flu exp )
+  m* r> 11 - sigexp>f r> r> r> r> r> r> ( ful flu fuu fll )
+  frot f+ frot f+ f+ ;
 
 : f< ( f1 f2 -- flag )
   f- f0< ;
