@@ -50,7 +50,7 @@
     swap >r >r ;
 
 : fr> ( -- f, R: f -- )
-    >r >r swap ;
+    r> r> swap ;
 
 : fdrop ( f -- )
  drop drop ;
@@ -115,6 +115,13 @@
 : d0< ( d -- flag )
   nip 0< ;
 
+\ splits a 24 bit double (e.g. the significand) in to two 12 bit singles --
+\ an upper and a lower (nU, nL) keeping the signs
+: dsplit ( d -- nU nL )
+  fdup 12 0 do d2/ loop d>s nfswap
+  20 0 do d2* loop
+  20 0 do d2/ loop d>s ;
+
 \ MISC
 
 true not constant false
@@ -162,6 +169,9 @@ true not constant false
   >r -32641 and ( 1000000001111111 ) r>
   127 + 7 lshift or
   ;
+
+: faddtoexponent ( f n -- f )
+  >r fdup fexponent r> + fsetexponent ;
 
 \ stores the sign of n in to f at addr
 : fsetsign ( f n -- )
@@ -287,6 +297,18 @@ true not constant false
 : f- ( f1 f2 -- f1-f2 )
   fnegate f+ ;
 
+: f* ( f1 f2 -- f1*f2 )
+  f>sigexp >r fswap ( d2 f1, R: n2 )
+  f>sigexp r> + >r ( d2 d1, R: exp )
+  dsplit fswap dsplit ( n1u n1l n2u n2l, R: exp )
+  fover fover ( n1u n1l n2u n2l n1u n1l n2u n2l , R: exp )
+  rot m* i 24 - sigexp>f r> nfswap f>r >f ( n1u n1l n2u n2l n1u n2u, R: fll exp )
+  m* i sigexp>f r> nfswap f>r >f ( n1u n1l n2u n2l, R: fll fuu exp )
+  rot rot ( n1u n2l n1l n2u, R: fll fuu exp )
+  m* i 12 - sigexp>f r> nfswap f>r >f ( n1u n2l, R: fll fuu flu exp )
+  m* r> 12 - sigexp>f fr> fr> fr> ( ful flu fuu fll )
+  frot f+ frot f+ f+ ; \ want to add fll in first and fuu in last
+
 : f< ( f1 f2 -- flag )
   f- f0< ;
 
@@ -303,7 +325,7 @@ true not constant false
 \ CONVERSION
 
 : d>f ( d -- f )
-  0 sigexp>f fdup fexponent 23 + fsetexponent ;
+  0 sigexp>f 23 faddtoexponent ;
 
 : s>f ( n -- f )
   s>d d>f ;
