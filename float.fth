@@ -148,25 +148,31 @@ true not constant false
 \ FROM WIKIPEDIA: "The true significand includes an implicit leading bit with
 \ value 1 unless the exponent is stored with all zeros." So we must test that
 \ both significand and exponent are all zeros (making the exponent -127). Also
-\ note that we can have +0 and -0
+\ note that we can have +0 and -0. This exponent of -127 really means -126,
+\ it's just a way to indicate the implicit leading bit should be left out.
 
-\ returns the exponent, properly biased
-: fexponent ( f -- n )
+\ returns the exponent, even if -127
+: frawexponent ( f -- n )
   nip
   32640 and ( 0111111110000000 )
   7 rshift
   127 - ;
+
+\ remember that an exponent of -127 really means subnormal so the actual
+\ exponent is -126
+: fexponent ( f -- n )
+  frawexponent -126 max ;
 
 \ returns +/- 1 for positive or negative, counts 0 as postive
 : fsign ( f -- n )
   nip 0< if -1 else 1 then ;
 
 \ returns the significand including sign and implicit 1 in the 24th place
-\ if it should be there (i.e. unless fexponent = -127 ). Note that the -0 and
-\ +0 both return d 0
+\ if it should be there (i.e. unless frawexponent = -127 ). Note that the -0
+\ and +0 both return d 0
 : fsignificand ( f -- d )
   fdup 127 and ( 0000000001111111 )
-  fover fexponent -127 = not if 128 + then
+  fover frawexponent -127 = not if 128 + then
   fover fsign 0< if dnegate then fnip ;
 
 \ n is exponent in range [-127,127]
@@ -177,9 +183,6 @@ true not constant false
   >r -32641 and ( 1000000001111111 ) r>
   127 + 7 lshift or
   ;
-
-: faddtoexponent ( f n -- f )
-  >r fdup fexponent r> + fsetexponent ;
 
 \ stores the sign of n in to f at addr
 : fsetsign ( f n -- )
@@ -194,13 +197,10 @@ true not constant false
 \ proper form beforehand aborts if out of range
 : fmakesignificand ( d -- f-with-exponent=-127 )
   dnegateifneg >r ( f d, R: flag )
-  dup 255 > abort" |significand| > 16777215 "
+  fdup 0 255 d> abort" |significand| > 16777215 "
   127 and
   r> if -1 fsetsign then
   ;
-
-: fsetsignificand ( f d -- f )
-  fmakesignificand fswap fexponent fsetexponent ;
 
 \ IT'S HANDY TO BREAK A FLOAT IN TO A D (SIGNIFICAND) AND N (EXPONENT)
 \ THE FOLLOWING FUNCTIONS MANIPULATE THAT PAIR
@@ -239,25 +239,30 @@ true not constant false
   \ take off sign
   nfswap ( ndswap ) dnegateifneg >r fnswap ( d n, R: flag )
 
-  \ if it's too large, shift it right
+  \ if the significand is too large, shift it right
   \ OR
   \ shift it right if the exponent is too small
   begin
     nfover ( ndover ) 0 128 d>
-    over -127 < or
+    over -126 < or
   while
     frshift
   repeat
 
-  \ if it's too small, shift it left
-  \ however, make sure to keep the exponent >=-127
+  \ if the significand is too small, shift it left
+  \ however, make sure to keep the exponent >=-126
   \ or zero would cause it to shift left forever
   begin
     nfover ( ndover ) 0 128 d< ( d n flag )
-    over -127 > and
+    over -126 > and
   while
     flshift
   repeat
+
+  \ check to see if it's a subnromal number by checking if the significand is
+  \ less than 24 digits
+  nfover 0 128 d<
+  if 1- then \ if it is, change the exponent from -126 to -127
 
   \ restore sign
   r> swap >r if dnegate then ( d, R: n )
@@ -266,6 +271,10 @@ true not constant false
 
 : f>sigexp ( f -- d-significand n-exponent )
   fdup fexponent >r fsignificand r> ;
+
+: faddtoexponent ( f n -- f )
+  >r f>sigexp r> + sigexp>f ;
+\  >r fdup fexponent r> + fsetexponent ;
 
 \ MATHEMATICAL OPERATORS
 
@@ -349,10 +358,10 @@ true not constant false
 : fzeroexponent ( f -- f n )
   0 nfswap \ will store the number of shifts ( n f )
 
-  fdup fexponent -127 =
+  fdup frawexponent -127 =
   if \ subnormal number, have to shift
     begin
-      fdup f2* fexponent -126 <
+      fdup f2* frawexponent -126 <
     while
       f2* fnswap 1+ nfswap
     repeat
