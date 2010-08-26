@@ -44,13 +44,6 @@
 \ FVARIABLE yes
 \ REPRESENT
 
-\ MISC
-
-true not constant false
-
-\ return +0
-0 0 fconstant f0
-
 \ STACK MANIPULATION WORDS
 
 \ DOESN'T WORK?
@@ -116,10 +109,21 @@ true not constant false
 : f! ( f addr -- )
   swap over ! cell+ ! ;
 
+\ MISC
+
+true not constant false
+
+\ return +0
+0 0 fconstant f0
+
 \ OPERATORS FOR DOUBLES
 
 : d0= ( d -- flag )
   0= swap 0= and ;
+
+\ should be installed by default?
+: d= ( d1 d2 -- flag )
+  d- d0= ;
 
 : d0< ( d -- flag )
   nip 0< ;
@@ -226,49 +230,39 @@ true not constant false
     flshiftn
   then ;
 
-\ shifts out all trailing zeros
-: fremovetrailing ( d n -- d n )
+: sigexp>f ( d-significand n-exponent -- f )
+\ the plan is to first make the signficand positive and then shift it so that
+\ it has a one in the 24th place (and handle the exponent accordingly) then
+\ take care of the sign and stick the significand and exponent together to
+\ make a float
+  
+  \ take off sign
+  nfswap ( ndswap ) dnegateifneg >r fnswap ( d n, R: flag )
+
+  \ if it's too large, shift it right
+  \ OR
+  \ shift it right if the exponent is too small
   begin
-    nfover ( really ndover ) drop 1 and 0=
+    nfover ( ndover ) 0 128 d>
+    over -127 < or
   while
     frshift
-  repeat ;
+  repeat
 
-: sigexp>f ( d-significand n-exponent -- f )
-  nfover ( ndover ) d0=
-  if \ take care of zero seperately
-    drop fdrop f0
-  else \ nonzero
-  \ the plan is to first make the signficand positive and then shift it so that
-  \ it has a one in the 24th place (and handle the exponent accordingly) then
-  \ take care of the sign and stick the significand and exponent together to
-  \ make a float
-  
-    \ take off sign
-    nfswap ( ndswap ) dnegateifneg >r fnswap ( d n, R: flag )
+  \ if it's too small, shift it left
+  \ however, make sure to keep the exponent >=-127
+  \ or zero would cause it to shift left forever
+  begin
+    nfover ( ndover ) 0 128 d< ( d n flag )
+    over -127 > and
+  while
+    flshift
+  repeat
 
-    \ if it's too large, shift it right
-    begin
-      nfover ( really dfover ) 0 128 d>
-    while
-      frshift
-    repeat
+  \ restore sign
+  r> swap >r if dnegate then ( d, R: n )
 
-    \ if it's too small, shift it left
-    \ however, make sure to keep the exponent >=-127
-    \ to allow for subnormal numbers
-    begin
-      nfover ( really ndover ) 0 128 d< ( d n flag )
-      over -127 > and
-    while
-      flshift
-    repeat
-
-    \ restore sign
-    r> swap >r if dnegate then ( d, R: n )
-
-    fmakesignificand r> fsetexponent
-  then ;
+  fmakesignificand r> fsetexponent ;
 
 : f>sigexp ( f -- d-significand n-exponent )
   fdup fexponent >r fsignificand r> ;
@@ -289,6 +283,18 @@ true not constant false
 : fabs ( f -- |f| )
   fdup f0< if fnegate then ;
 
+\ strict equality -- no rangle for wiggle room
+: f= ( f1 f2 -- flag )
+  f>sigexp >r fswap f>sigexp >r d= r> r> = and ;
+
+\ sigexp>f will take care of changing significand if nescessary --
+\ such as for subnormal numbers
+: f2/ ( f -- f/2 )
+  f>sigexp 1- sigexp>f ;
+
+: f2* ( f -- f/2 )
+  f>sigexp 1+ sigexp>f ;
+
 \ NOTE: might run in to trouble subtracting two numbers that are close in
 \ magnitude. We shift 6 extra spaces to the left before adding to get some
 \ additional significant digits, have to think about this more
@@ -298,12 +304,15 @@ true not constant false
 \ pair
 : f+ ( f1 f2 -- f1+f2 )
   fover fexponent >r fdup fexponent r> max 6 - ( f1 f2 n-max-exp )
-  >r f>sigexp i fshiftto drop ( f1 d2, R: n-max )
-  fswap ( dfswap ) f>sigexp i fshiftto drop ( d2 d1, R: n-max)
+  >r f>sigexp r@ fshiftto drop ( f1 d2, R: n-max )
+  fswap ( dfswap ) f>sigexp r@ fshiftto drop ( d2 d1, R: n-max)
   d+ r> sigexp>f ;
 
 : f- ( f1 f2 -- f1-f2 )
   fnegate f+ ;
+
+: f< ( f1 f2 -- flag )
+  f- f0< ;
 
 \ The basic idea is to break the significand of each float in to two 12bit
 \ pieces. These are nice to work with, because we can use m* to multiply them
@@ -317,16 +326,13 @@ true not constant false
   f>sigexp r> + >r ( d2 d1, R: exp )
   dsplit fswap dsplit ( n1u n1l n2u n2l, R: exp )
   fover fover ( n1u n1l n2u n2l n1u n1l n2u n2l , R: exp )
-  rot m* i 23 - sigexp>f r> nfswap >r >r >r
+  rot m* r@ 23 - sigexp>f r> nfswap >r >r >r
   ( n1u n1l n2u n2l n1u n2u, R: fll exp )
-  m* i 1+ sigexp>f r> nfswap >r >r >r ( n1u n1l n2u n2l, R: fll fuu exp )
+  m* r@ 1+ sigexp>f r> nfswap >r >r >r ( n1u n1l n2u n2l, R: fll fuu exp )
   rot rot ( n1u n2l n1l n2u, R: fll fuu exp )
-  m* i 11 - sigexp>f r> nfswap >r >r >r ( n1u n2l, R: fll fuu flu exp )
+  m* r@ 11 - sigexp>f r> nfswap >r >r >r ( n1u n2l, R: fll fuu flu exp )
   m* r> 11 - sigexp>f r> r> r> r> r> r> ( ful flu fuu fll )
   frot f+ frot f+ f+ ;
-
-: f< ( f1 f2 -- flag )
-  f- f0< ;
 
 : fmax ( f1 f2 -- f )
   fover fover f- f0<
@@ -337,6 +343,23 @@ true not constant false
   fover fover f- f0< not
   if fswap then
   fdrop ;
+
+\ makes the exponent zero and returns the old exponent or what the exponent
+\ would have been for subnormal numbers.
+: fzeroexponent ( f -- f n )
+  0 nfswap \ will store the number of shifts ( n f )
+
+  fdup fexponent -127 =
+  if \ subnormal number, have to shift
+    begin
+      fdup f2* fexponent -126 <
+    while
+      f2* fnswap 1+ nfswap
+    repeat
+  then
+  ( n f )
+  fnswap >r ( f, R: n )  
+  fdup fexponent >r 0 fsetexponent r> r> - ;
 
 \ CONVERSION
 
