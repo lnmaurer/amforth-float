@@ -358,17 +358,40 @@ true not constant false
 : fzeroexponent ( f -- f n )
   0 nfswap \ will store the number of shifts ( n f )
 
-  fdup frawexponent -127 =
-  if \ subnormal number, have to shift
-    begin
-      fdup f2* frawexponent -126 <
-    while
-      f2* fnswap 1+ nfswap
-    repeat
-  then
-  ( n f )
+  \ if it's subnormal, shift it left until it isn't
+  begin
+    fdup frawexponent -127 =
+  while
+    f2* fnswap 1+ nfswap
+  repeat
+
   fnswap >r ( f, R: n )  
   fdup fexponent >r 0 fsetexponent r> r> - ;
+
+: f/ ( f1 f2 -- f1/f2 )
+  fdup f0= abort" division by zero "
+  fzeroexponent >r ( f1 f2, R: n2 )
+  fswap fzeroexponent r> - >r fswap ( f1 f2, R: n1-n2 )
+  \ f1 will be known as remainder, f2 as divisor, and n1-n2 as exponent
+  f0 frot frot ( sum remainder divisor, R: exponent )
+  [ 1 s>f ] frot frot ( sum toadd remainder divisor, R: exponent )
+
+  \ floats only have 24 significant digits, but if f2>f1 then first digit is
+  \ insignificant, so do 25 to be safe
+  25 0 do 
+    fover f0= if leave then \ no need to continue if remainder is zero
+    fover fover f< not
+    if \ remainder >= than divisor
+      ftuck f- fswap
+      >r >r >r >r ( sum toadd, R: exponent divisor remainder )
+      ftuck f+ fswap
+      r> r> r> r>
+    then
+    \ either way, half toadd and divisor
+    f2/ >r >r >r >r f2/ r> r> r> r>
+  loop
+
+  fdrop fdrop fdrop r> faddtoexponent ;
 
 \ CONVERSION
 
