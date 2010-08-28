@@ -289,6 +289,9 @@ true not constant false
 : fnegate ( f -- -f )
   fdup fsign negate fsetsign ;
 
+: fnegateifneg ( d -- d flag )
+  fdup f0< if fnegate true else false then ;
+
 : fabs ( f -- |f| )
   fdup f0< if fnegate then ;
 
@@ -356,25 +359,34 @@ true not constant false
 \ makes the exponent zero and returns the old exponent or what the exponent
 \ would have been for subnormal numbers.
 : fzeroexponent ( f -- f n )
-  0 nfswap \ will store the number of shifts ( n f )
+  fdup f0=
+  if \ it's zero, not much to do
+    0
+  else
+    0 nfswap \ will store the number of shifts ( n f )
 
-  \ if it's subnormal, shift it left until it isn't
-  begin
-    fdup frawexponent -127 =
-  while
-    f2* fnswap 1+ nfswap
-  repeat
+    \ if it's subnormal, shift it left until it isn't
+    begin
+      fdup frawexponent -127 =
+    while
+      f2* fnswap 1+ nfswap
+    repeat
 
-  fnswap >r ( f, R: n )  
-  fdup fexponent >r 0 fsetexponent r> r> - ;
+    fnswap >r ( f, R: n )  
+    fdup fexponent >r 0 fsetexponent r> r> - 
+  then ;
 
 : f/ ( f1 f2 -- f1/f2 )
   fdup f0= abort" division by zero "
+
+  fnegateifneg >r fswap fnegateifneg >r fswap
+  r> r> xor >r ( f1 f2, R: flag-negative )
+
   fzeroexponent >r ( f1 f2, R: n2 )
-  fswap fzeroexponent r> - >r fswap ( f1 f2, R: n1-n2 )
+  fswap fzeroexponent r> - >r fswap ( f1 f2, R: negative n1-n2 )
   \ f1 will be known as remainder, f2 as divisor, and n1-n2 as exponent
-  f0 frot frot ( sum remainder divisor, R: exponent )
-  [ 1 s>f ] frot frot ( sum toadd remainder divisor, R: exponent )
+  f0 frot frot ( sum remainder divisor, R: negative exponent )
+  [ 0 128 0 sigexp>f ] frot frot ( sum toadd remainder divisor, R: negative exponent )
 
   \ floats only have 24 significant digits, but if f2>f1 then first digit is
   \ insignificant, so do 25 to be safe
@@ -383,7 +395,7 @@ true not constant false
     fover fover f< not
     if \ remainder >= than divisor
       ftuck f- fswap
-      >r >r >r >r ( sum toadd, R: exponent divisor remainder )
+      >r >r >r >r ( sum toadd, R: negative exponent divisor remainder )
       ftuck f+ fswap
       r> r> r> r>
     then
@@ -391,7 +403,8 @@ true not constant false
     f2/ >r >r >r >r f2/ r> r> r> r>
   loop
 
-  fdrop fdrop fdrop r> faddtoexponent ;
+  fdrop fdrop fdrop r> faddtoexponent 
+  r> if fnegate then ;
 
 \ CONVERSION
 
