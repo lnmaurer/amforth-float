@@ -1,48 +1,4 @@
-\ This floating point implimentation is inspired by the IEEE 754-2008 binary32
-\ format -- your standard single precision float. I adapted their format to fit
-\ with the way amforth handles double length integers (henceforth 'doubles'),
-\ with the most significant cell higher on the stack. The most significant bit
-\ is the sign bit, followed by a byte for the exponent, and the remaining 23
-\ bits for the significand. See the basics at:
-\ http://en.wikipedia.org/wiki/Single_precision_floating-point_format
-
-\ These floats are stored on the data stack -- not on their own seperate stack.
-
-\ ANS94 Floating-point words check list
-\ Words with 'yes' next to them have been implimented. 
-\ see http://lars.nocrew.org/dpans/dpans12.htm
-
-\ >FLOAT
-\ D>F yes
-\ F! yes
-\ F* yes
-\ F+ yes
-\ F- yes
-\ F/
-\ F0< yes
-\ F0= yes
-\ F< yes
-\ F>D yes
-\ F@ yes
-\ FALIGN
-\ FALIGNED
-\ FCONSTANT yes
-\ FDEPTH
-\ FDROP yes
-\ FDUP yes
-\ FLITERAL
-\ FLOAT+ 
-\ FLOATS
-\ FLOOR
-\ FMAX yes
-\ FMIN yes
-\ FNEGATE yes
-\ FOVER yes
-\ FROT yes
-\ FROUND
-\ FSWAP yes
-\ FVARIABLE yes
-\ REPRESENT
+\ marker ->clean
 
 \ STACK MANIPULATION WORDS
 
@@ -121,9 +77,9 @@ true not constant false
 : d0= ( d -- flag )
   0= swap 0= and ;
 
-\ should be installed by default?
-: d= ( d1 d2 -- flag )
-  d- d0= ;
+\ wasn't installed by default, so add it if you haven't included it
+\ : d= ( d1 d2 -- flag )
+\   d- d0= ;
 
 : d0< ( d -- flag )
   nip 0< ;
@@ -382,11 +338,12 @@ true not constant false
   fnegateifneg >r fswap fnegateifneg >r fswap
   r> r> xor >r ( f1 f2, R: flag-negative )
 
-  fzeroexponent >r ( f1 f2, R: n2 )
+  fzeroexponent >r ( f1 f2, R: negative n2 )
   fswap fzeroexponent r> - >r fswap ( f1 f2, R: negative n1-n2 )
   \ f1 will be known as remainder, f2 as divisor, and n1-n2 as exponent
   f0 frot frot ( sum remainder divisor, R: negative exponent )
-  [ 0 128 0 sigexp>f ] frot frot ( sum toadd remainder divisor, R: negative exponent )
+  \ [ 0 128 0 sigexp>f ]
+  0 16256 frot frot ( sum toadd remainder divisor, R: negative exponent )
 
   \ floats only have 24 significant digits, but if f2>f1 then first digit is
   \ insignificant, so do 25 to be safe
@@ -403,7 +360,7 @@ true not constant false
     f2/ >r >r >r >r f2/ r> r> r> r>
   loop
 
-  fdrop fdrop fdrop r> faddtoexponent 
+  fdrop fdrop fdrop r> faddtoexponent
   r> if fnegate then ;
 
 \ CONVERSION
@@ -418,5 +375,7 @@ true not constant false
   f>sigexp 23 fshiftto drop ;
 
 : f>s ( f -- n )
-  f>d d>s ;
+  f>d d>s ;  
+
+\ marker ->afterfloat
 

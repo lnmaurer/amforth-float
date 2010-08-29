@@ -5,6 +5,9 @@ amforth.sourceforge.net
 This is just a personal project -- I am not involved with the development of
 amforth.
 
+The code requires 'd=', which doesn't seem to be compiled automatically. So
+either add it to dict_appl.inc or uncomment the code for it below.
+
 This floating point implementation is inspired by the IEEE 754-2008 binary32
 format -- your standard single precision float. I adapted their format to fit
 with the way amforth handles double length integers (henceforth 'doubles'),
@@ -25,7 +28,7 @@ F! yes
 F* yes
 F+ yes
 F- yes
-F/
+F/ yes
 F0< yes
 F0= yes
 F< yes
