@@ -1,4 +1,6 @@
-\ marker ->clean
+\ you can skip the next line if you'd like, but it makes is easier to erase
+\ and reload these floating point words
+marker ->clean
 
 \ STACK MANIPULATION WORDS
 
@@ -153,7 +155,9 @@ true not constant false
 \ proper form beforehand aborts if out of range
 : fmakesignificand ( d -- f-with-exponent=-127 )
   dnegateifneg >r ( f d, R: flag )
-  fdup 0 255 d> abort" |significand| > 16777215 "
+  \ only need to look at upper half of double to see if it's too large
+  \ the upper half can only use the first 8 digits
+  dup 255 > abort" |significand| > 16777215 "
   127 and
   r> if -1 fsetsign then
   ;
@@ -199,7 +203,9 @@ true not constant false
   \ OR
   \ shift it right if the exponent is too small
   begin
-    nfover ( ndover ) 0 128 d>
+    \ only need to look at upper half of double to see if it's too large
+    \ the upper half should use the first 8 digits
+    over 255 > \ 255 is all ones in the first 8 places -- b11111111
     over -126 < or
   while
     frshift
@@ -209,7 +215,7 @@ true not constant false
   \ however, make sure to keep the exponent >=-126
   \ or zero would cause it to shift left forever
   begin
-    nfover ( ndover ) 0 128 d< ( d n flag )
+    over 128 < \ 128 is one followed by seven zeros -- b10000000
     over -126 > and
   while
     flshift
@@ -342,7 +348,8 @@ true not constant false
   fswap fzeroexponent r> - >r fswap ( f1 f2, R: negative n1-n2 )
   \ f1 will be known as remainder, f2 as divisor, and n1-n2 as exponent
   f0 frot frot ( sum remainder divisor, R: negative exponent )
-  \ [ 0 128 0 sigexp>f ]
+  \ [ 0 128 0 sigexp>f ] is better than 0 16256
+  \ but it gets bit by the double length number in colon definition bug
   0 16256 frot frot ( sum toadd remainder divisor, R: negative exponent )
 
   \ floats only have 24 significant digits, but if f2>f1 then first digit is
@@ -377,5 +384,6 @@ true not constant false
 : f>s ( f -- n )
   f>d d>s ;  
 
-\ marker ->afterfloat
+\ again, the next line is for convienence, not nescessity
+marker ->afterfloat
 
