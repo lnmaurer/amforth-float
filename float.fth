@@ -93,11 +93,19 @@ true not constant false
 
 \ splits a 24 bit double (e.g. the significand) in to two 12 bit singles --
 \ an upper and a lower (nU, nL) keeping the signs
+\ we remove the sign at the beginning and add it back at the end because you
+\ can run in to inconsistancies otherwise. For example:
+\ > -13176795. d2/ d.
+\ -6588398  ok
+\ > 13176795. d2/ d.
+\ 6588397  ok
 : dsplit ( d -- nU nL )
-  \ get the upper half by just shifting it 12 times to the right
-  fdup 12 0 do d2/ loop d>s nfswap
-  \ get the lower half using a mask and keeping track of the sign
-  dnegateifneg >r drop 4095 and
+  dnegateifneg >r fdup ( ddup )
+  \ get the upper half by shifting it 12 times to the right
+  12 0 do d2/ loop d>s
+  r@ if negate then nfswap ( ndswap )
+  \ get the lower half using a mask
+  drop 4095 ( 0000111111111111 ) and
   r> if negate then ;
 
 \ HELPER WORDS FOR SEPERATING OUT AND PUTTING BACK TOGETHER THE DIFFERENT
