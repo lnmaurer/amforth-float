@@ -22,6 +22,8 @@ ANS94 Floating-point words check list
 Words with 'yes' next to them have been implemented. 
 see http://lars.nocrew.org/dpans/dpans12.htm
 
+Floating-Point words:
+
 >FLOAT
 D>F yes
 F! yes
@@ -53,3 +55,47 @@ FROUND
 FSWAP yes
 FVARIABLE yes
 REPRESENT
+
+Floating-Point extension words:
+
+DF!
+DF@
+DFALIGN
+DFALIGNED
+DFLOAT+
+DFLOATS
+F**
+F.
+FABS yes
+FACOS
+FACOSH
+FALOG
+FASIN
+FASINH
+FATAN
+FATAN2
+FATANH
+FCOS
+FCOSH
+FE.
+FEXP
+FEXPM1
+FLN
+FLNP1
+FLOG
+FS. yes
+FSIN
+FSINCOS
+FSINH
+FSQRT
+FTAN
+FTANH
+F~
+PRECISION
+SET-PRECISION 
+SF! 
+SF@
+SFALIGN
+SFALIGNED
+SFLOAT+
+SFLOATS

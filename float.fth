@@ -74,6 +74,9 @@ true not constant false
 \ return +0
 0 0 fconstant f0
 
+: emitdigit ( n -- )
+  48 + emit ;
+
 \ OPERATORS FOR DOUBLES
 
 : d0= ( d -- flag )
@@ -246,6 +249,20 @@ true not constant false
   >r f>sigexp r> + sigexp>f ;
 \  >r fdup fexponent r> + fsetexponent ;
 
+\ CONVERSION
+
+: d>f ( d -- f )
+  0 sigexp>f 23 faddtoexponent ;
+
+: s>f ( n -- f )
+  s>d d>f ;
+
+: f>d ( f -- d )
+  f>sigexp 23 fshiftto drop ;
+
+: f>s ( f -- n )
+  f>d d>s ;  
+
 \ MATHEMATICAL OPERATORS
 
 \ fsignificand takes care of the +/- 0 problem
@@ -295,6 +312,15 @@ true not constant false
 
 : f< ( f1 f2 -- flag )
   f- f0< ;
+
+: f> ( f1 f2 -- flag )
+  fswap f< ;
+
+: f>= ( f1 f2 -- flag )
+  f< not ;
+
+: f<= ( f1 f2 -- flag )
+  f> not ;
 
 \ The basic idea is to break the significand of each float in to two 12bit
 \ pieces. These are nice to work with, because we can use m* to multiply them
@@ -378,19 +404,110 @@ true not constant false
   fdrop fdrop fdrop r> faddtoexponent
   r> if fnegate then ;
 
-\ CONVERSION
+\ the greatest integer <= the float
+\ e.g. the floor of 3.5 is 3
+\ and the floor of -3.5 is -4
+\ the division in fshiftto gets rid of the fractional part
+: ffloor ( f -- f )
+  f>sigexp 23 fshiftto sigexp>f ;
 
-: d>f ( d -- f )
-  0 sigexp>f 23 faddtoexponent ;
+\ the ceiling of x is -floor(-x)
+: fceil ( f -- f )
+  fnegate ffloor fnegate ;
 
-: s>f ( n -- f )
-  s>d d>f ;
+\ returns f mod 1 -- basically the fractional part of f
+\ fmod1(f) = f - ffloor(f)
+: fmod1 ( f -- f )
+  fdup ffloor f- ;
 
-: f>d ( f -- d )
-  f>sigexp 23 fshiftto drop ;
+\ print f using scientific notation
+\ this uses the dragon2 algorithm from
+\ "How to print floating point numbers accurately"
+\ by Steele and White
+\ in our implimentation, their P=25
+: fs. ( f -- )
+  \ handle zero seperately
+  fdup f0=
+  if
+    fdrop 48 46 48 emit emit emit \ prints "0.0"
+  else
+    \ first, let's take care of the sign
+    fdup f0<
+    if
+      fnegate \ make it positive
+      45 emit \ print a "-"
+    then
 
-: f>s ( f -- n )
-  f>d d>s ;  
+    \ next, we scale the number to be in [1,10)
+    0 nfswap \ the 0 is the x in dragon2 algorithm
+
+    \ if it's too large, make it smaller
+    begin
+      fdup 10 s>f f>= \ [ 10 s>f ]
+    while
+      10 s>f f/ \ [ 10 s>f ]
+      fnswap 1+ nfswap
+    repeat
+
+    \ if it's too small, make it bigger
+    begin
+      fdup 1 s>f f< \ [ 1 s>f ]
+    while
+      10 s>f f* \ [ 10 s>f ]
+      fnswap 1- nfswap
+    repeat
+
+    \ the float on the stack is called v' in the dragon2 algorithm
+
+    fdup ffloor f>s emitdigit \ now we can print the first digit
+    46 emit \ the decimal point
+
+    \ calculate n = p - floor(log2(v')) - 1
+    24 \ that's p - 1 since p is 25
+    nfover 2 s>f f> if 1- \ [ 2 s>f ]
+    nfover 4 s>f f> if 1- \ [ 4 s>f ]
+    nfover 8 s>f f> if 1- then then then \ [ 8 s>f ]
+    
+    \ now the stack is ( s-x f-v' s-n )
+
+    \ let's construct M = 2^(-n)/2 = 2^(-n-1)
+    negate 1- >r
+    1 s>f r> fsetexponent ( s-x f-v' f-M ) \ [ 1 s>f ]
+
+    \ don't care about k in algorithm since we'll just print immediatly
+    \ R in algorithm is fractional part of v'
+    fswap fmod1 ( s-x f-M f-R )
+
+    \ in dragon2, use B=10 because that's the base we want
+    begin
+      \ calculate the digit (their U) and move to return stack
+      fdup 10 s>f f* ffloor f>s >r ( s-x f-M f-R, R: s-U ) \ [ 10 s>f ]
+      \ update R
+      10 s>f f* fmod1 \ [ 10 s>f ]
+      \ update M
+      fswap 10 s>f f* fswap \ [ 10 s>f ]
+      fover fover f<= >r
+      fover 1 s>f f- fover fnegate f<= \ [ 10 s>f ]
+      r> and
+    while
+      \ output the digit (their U )
+      r> emitdigit
+    repeat
+
+    \ take care of the final digit (their case statement)
+    r> nfover 1 s>f f2/ f> \ [ 1 s>f f2/ ]
+    if 1+ then
+    emitdigit
+
+    fdrop fdrop \ M and R are no longer of use to us
+
+    \ x has been waiting patiently at the bottom of the stack this whole time
+    ?dup if
+      69 emit . \ if it's non-zero, print "E" then print x
+    else
+      bl emit \ otherwise, just print a space
+    then
+  then ;
 
 \ again, the next line is for convienence, not nescessity
 marker ->afterfloat
