@@ -442,18 +442,40 @@ true not constant false
     0 nfswap \ the 0 is the x in dragon2 algorithm
 
     \ if it's too large, make it smaller
+    \THREE VERSIONS, PICK YOUR POISON
+\ SLOW BUT CLEAN:
+\    begin
+\      fdup [ 10 s>f swap ] literal literal f>=
+\    while
+\      [ 10 s>f swap ] literal literal f/ 
+\      fnswap 1+ nfswap
+\    repeat
+\ FAST AND CLEAN BUT WITH MORE ROUNDING ERRORS:
+\    begin
+\      fdup [ 10 s>f swap ] literal literal f>=
+\    while
+\      [ 1 s>f 10 s>f f/ swap ] literal literal f* 
+\      fnswap 1+ nfswap
+\    repeat
+\ GOOD COMPROMISE:
+    [ 1 s>f swap ] literal literal ( s-x f-v f-1 )
     begin
-      fdup 10 s>f f>= \ [ 10 s>f ]
+      fover fover [ 10 s>f swap ] literal literal f* ( s-x f-v f-powerof10 f-v f-10*powerof10 )
+      fdup >r >r ( s-x f-v f-powerof10 f-v f-10*powerof10, R: f-10*powerof10 )
+      f>=
     while
-      10 s>f f/ \ [ 10 s>f ]
+      fdrop
       fnswap 1+ nfswap
+      r> r>
     repeat
+    r> r> fdrop ( s-x f-v f-powerof10 )
+    f/
 
     \ if it's too small, make it bigger
     begin
-      fdup 1 s>f f< \ [ 1 s>f ]
+      fdup [ 1 s>f swap ] literal literal f<
     while
-      10 s>f f* \ [ 10 s>f ]
+      [ 10 s>f swap ] literal literal f*
       fnswap 1- nfswap
     repeat
 
@@ -464,15 +486,15 @@ true not constant false
 
     \ calculate n = p - floor(log2(v')) - 1
     24 \ that's p - 1 since p is 25
-    nfover 2 s>f f> if 1- \ [ 2 s>f ]
-    nfover 4 s>f f> if 1- \ [ 4 s>f ]
-    nfover 8 s>f f> if 1- then then then \ [ 8 s>f ]
+    nfover [ 2 s>f swap ] literal literal f> if 1-
+    nfover [ 4 s>f swap ] literal literal f> if 1-
+    nfover [ 8 s>f swap ] literal literal f> if 1- then then then
     
     \ now the stack is ( s-x f-v' s-n )
 
     \ let's construct M = 2^(-n)/2 = 2^(-n-1)
     negate 1- >r
-    1 s>f r> fsetexponent ( s-x f-v' f-M ) \ [ 1 s>f ]
+    [ 1 s>f swap ] literal literal r> fsetexponent ( s-x f-v' f-M )
 
     \ don't care about k in algorithm since we'll just print immediatly
     \ R in algorithm is fractional part of v'
@@ -481,13 +503,13 @@ true not constant false
     \ in dragon2, use B=10 because that's the base we want
     begin
       \ calculate the digit (their U) and move to return stack
-      fdup 10 s>f f* ffloor f>s >r ( s-x f-M f-R, R: s-U ) \ [ 10 s>f ]
+      fdup [ 10 s>f swap ] literal literal f* ffloor f>s >r ( s-x f-M f-R, R: s-U )
       \ update R
-      10 s>f f* fmod1 \ [ 10 s>f ]
+      [ 10 s>f swap ] literal literal f* fmod1
       \ update M
-      fswap 10 s>f f* fswap \ [ 10 s>f ]
+      fswap [ 10 s>f swap ] literal literal f* fswap
       fover fover f<= >r
-      fover 1 s>f f- fover fnegate f<= \ [ 10 s>f ]
+      fover [ 1 s>f swap ] literal literal f- fover fnegate f<=
       r> and
     while
       \ output the digit (their U )
@@ -495,7 +517,7 @@ true not constant false
     repeat
 
     \ take care of the final digit (their case statement)
-    r> nfover 1 s>f f2/ f> \ [ 1 s>f f2/ ]
+    r> nfover [ 1 s>f f2/ swap ] literal literal f>
     if 1+ then
     emitdigit
 
