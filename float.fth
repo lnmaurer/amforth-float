@@ -442,7 +442,7 @@ true not constant false
     0 nfswap \ the 0 is the x in dragon2 algorithm
 
     \ if it's too large, make it smaller
-    \THREE VERSIONS, PICK YOUR POISON
+    \ THREE VERSIONS, PICK YOUR POISON
 \ SLOW BUT CLEAN:
 \    begin
 \      fdup [ 10 s>f swap ] literal literal f>=
