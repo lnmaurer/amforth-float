@@ -193,13 +193,21 @@ true not constant false
   dup 0> if 0 do flshift loop else drop then ;
 
 \ shifts until the exponent is the desired value
-: fshiftto ( d-significand n-exponent n-desired-exponent -- d n )
+: fshifttoexp ( d-significand n-exponent n-desired-exponent -- d n )
   over - dup abs swap 0> ( d n n-abs-diff n-diff )
   if 
     frshiftn
   else
     flshiftn
   then ;
+
+\ shifts significand until there is a 1 in the 'n-digit' digit -- the first
+\ digit corresponds to n-digit = 0
+\ INCOMPLETE
+: fshifttopos ( d-significand n-exponent n-digit -- d n )
+  >r 0 0 r> 0 ( d-significand n-exponent d-0 n-digit n-0 -- d n )
+
+  ;
 
 : sigexp>f ( d-significand n-exponent -- f )
 \ the plan is to first make the signficand positive and then shift it so that
@@ -258,7 +266,7 @@ true not constant false
   s>d d>f ;
 
 : f>d ( f -- d )
-  f>sigexp 23 fshiftto drop ;
+  f>sigexp 23 fshifttoexp drop ;
 
 : f>s ( f -- n )
   f>d d>s ;  
@@ -303,8 +311,8 @@ true not constant false
 \ pair
 : f+ ( f1 f2 -- f1+f2 )
   fover fexponent >r fdup fexponent r> max 6 - ( f1 f2 n-max-exp )
-  >r f>sigexp r@ fshiftto drop ( f1 d2, R: n-max )
-  fswap ( dfswap ) f>sigexp r@ fshiftto drop ( d2 d1, R: n-max)
+  >r f>sigexp r@ fshifttoexp drop ( f1 d2, R: n-max )
+  fswap ( dfswap ) f>sigexp r@ fshifttoexp drop ( d2 d1, R: n-max)
   d+ r> sigexp>f ;
 
 : f- ( f1 f2 -- f1-f2 )
@@ -407,9 +415,9 @@ true not constant false
 \ the greatest integer <= the float
 \ e.g. the floor of 3.5 is 3
 \ and the floor of -3.5 is -4
-\ the division in fshiftto gets rid of the fractional part
+\ the division in fshifttoexp gets rid of the fractional part
 : ffloor ( f -- f )
-  f>sigexp 23 fshiftto sigexp>f ;
+  f>sigexp 23 fshifttoexp sigexp>f ;
 
 \ the ceiling of x is -floor(-x)
 : fceil ( f -- f )
@@ -530,6 +538,55 @@ true not constant false
       bl emit \ otherwise, just print a space
     then
   then ;
+
+\ COME UP WITH BETTER NAMES FOR NEXT TWO
+\ returns the number that occupies the part of the string from n-location + 1 to the end
+: partnumber ( n-adr n-length n-location -- n )
+  over over - 1- rot drop rot rot + swap ( new_adr new_length )
+  over dup
+  c@ >r ( store the value that was at n-location to the return stack )
+  c! ( store the length there to make a counted string )
+  dup number ( new_adr num, R: previous_value )
+  r> rot c! ; ( return the value to its previous place )
+
+: extract ( n-adr n-length c-char -- n-adr n-new-length n-extracted )
+  >r over over r> cscan nip ( adr count loc )
+  over over = 
+  if \ character not found
+    drop 0
+  else \ character found, note that loc becomes new-length
+    swap >r ( adr loc, R: length )
+    over over r> swap ( adr loc adr length loc )
+    partnumber 
+  then ;
+
+\ string of form 'integer'.'fractioal'e'exp'
+: >float ( c-addr u-length -- f )
+  \ get exponent first -- 101 is 'e' NEED TO ALSO ACCEPT E,d,D
+  over over 101 extract >r ( adr length, R: exp )
+  \ next get fractional part -- 46 is '.'
+  over over 46 extract >r ( adr length, R: exp fractional )
+  -1 partnumber ( integer, R: exp fractional )
+  s>f r> s>f ( f-integer f-fractional, R: exp )
+
+  \ make f-fractional a fraction
+  begin
+    fdup [ 1 s>f swap ] literal literal f>
+  while
+    [ 10 s>f swap ] literal literal f/
+  repeat
+  
+  f+ \ combine fractional and integer parts
+
+  \ now, shift according to exp
+  r> dup 0<
+  if
+    negate
+    0 do [ 10 s>f swap ] literal literal f/ loop
+  else
+    0 do [ 10 s>f swap ] literal literal f* loop
+  then ;
+
 
 \ again, the next line is for convienence, not nescessity
 marker ->afterfloat
