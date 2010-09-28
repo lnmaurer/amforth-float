@@ -380,37 +380,92 @@ true not constant false
     fdup fexponent >r 0 fsetexponent r> r> - 
   then ;
 
+\ : f/ ( f1 f2 -- f1/f2 )
+\  fdup f0= abort" division by zero "
+\
+\  fnegateifneg >r fswap fnegateifneg >r fswap
+\  r> r> xor >r ( f1 f2, R: flag-negative )
+\
+\  fzeroexponent >r ( f1 f2, R: negative n2 )
+\  fswap fzeroexponent r> - >r fswap ( f1 f2, R: negative n1-n2 )
+\  \ f1 will be known as remainder, f2 as divisor, and n1-n2 as exponent
+\  f0 frot frot ( sum remainder divisor, R: negative exponent )
+\  \ [ 0 128 0 sigexp>f ] is better than 0 16256
+\  \ but it gets bit by the double length number in colon definition bug
+\  0 16256 frot frot ( sum toadd remainder divisor, R: negative exponent )
+\
+\  \ floats only have 24 significant digits, but if f2>f1 then first digit is
+\  \ insignificant, so do 25 to be safe
+\  25 0 do 
+\    fover f0= if leave then \ no need to continue if remainder is zero
+\    fover fover f< not
+\    if \ remainder >= than divisor
+\      ftuck f- fswap
+\      >r >r >r >r ( sum toadd, R: negative exponent divisor remainder )
+\      ftuck f+ fswap
+\      r> r> r> r>
+\    then
+\    \ either way, half toadd and divisor
+\    f2/ >r >r >r >r f2/ r> r> r> r>
+\  loop
+\
+\  fdrop fdrop fdrop r> faddtoexponent
+\  r> if fnegate then ;
+
 : f/ ( f1 f2 -- f1/f2 )
   fdup f0= abort" division by zero "
 
   fnegateifneg >r fswap fnegateifneg >r fswap
   r> r> xor >r ( f1 f2, R: flag-negative )
 
-  fzeroexponent >r ( f1 f2, R: negative n2 )
-  fswap fzeroexponent r> - >r fswap ( f1 f2, R: negative n1-n2 )
-  \ f1 will be known as remainder, f2 as divisor, and n1-n2 as exponent
-  f0 frot frot ( sum remainder divisor, R: negative exponent )
-  \ [ 0 128 0 sigexp>f ] is better than 0 16256
-  \ but it gets bit by the double length number in colon definition bug
-  0 16256 frot frot ( sum toadd remainder divisor, R: negative exponent )
+  f>sigexp ( f1 d2 n2, R: negative )
 
-  \ floats only have 24 significant digits, but if f2>f1 then first digit is
-  \ insignificant, so do 25 to be safe
-  25 0 do 
-    fover f0= if leave then \ no need to continue if remainder is zero
-    fover fover f< not
+  \ get d2 so that it has a one in the 25th place
+  begin
+    >r ( f1 d2, r: negative n2 )
+    dup 4096 <
+    r> swap
+  while
+    flshift
+  repeat
+
+  >r fswap f>sigexp ( d2 d1 n1, R: negative n2 )
+  \ get d1 so that it has a one in the 25th place
+  begin
+    >r
+    dup 4096 <
+    r> swap
+  while
+    flshift
+  repeat
+
+  r> - 5 - >r fswap ( d1 d2, R: negative n1-n2 )
+
+  \ d1 will be known as remainder, d2 as divisor, and n1-n2 as exponent
+  \ put sum on the stack, initialized to zero
+  0 0 frot frot ( sum remainder divisor, R: negative exponent )
+  \ now, put in the thing we'll add
+  0 4096 frot frot ( sum toadd remainder divisor, R: negative exponent )
+
+  \ floats only have 24 significant digits, but if d2>d1 then first digit is
+  \ insignificant, so do 26 to be safe
+  26 0 do 
+    fover d0= if leave then \ no need to continue if remainder is zero
+    fover fover d< not
     if \ remainder >= than divisor
-      ftuck f- fswap
+      ftuck d- fswap
       >r >r >r >r ( sum toadd, R: negative exponent divisor remainder )
-      ftuck f+ fswap
+      ftuck d+ fswap
       r> r> r> r>
     then
     \ either way, half toadd and divisor
-    f2/ >r >r >r >r f2/ r> r> r> r>
+    d2/ >r >r >r >r d2/ r> r> r> r>
   loop
 
-  fdrop fdrop fdrop r> faddtoexponent
+  fdrop fdrop fdrop r> sigexp>f
   r> if fnegate then ;
+
+
 
 \ the greatest integer <= the float
 \ e.g. the floor of 3.5 is 3
@@ -452,12 +507,12 @@ true not constant false
     \ if it's too large, make it smaller
     \ THREE VERSIONS, PICK YOUR POISON
 \ SLOW BUT CLEAN:
-\    begin
-\      fdup [ 10 s>f swap ] literal literal f>=
-\    while
-\      [ 10 s>f swap ] literal literal f/ 
-\      fnswap 1+ nfswap
-\    repeat
+    begin
+      fdup [ 10 s>f swap ] literal literal f>=
+    while
+      [ 10 s>f swap ] literal literal f/ 
+      fnswap 1+ nfswap
+    repeat
 \ FAST AND CLEAN BUT WITH MORE ROUNDING ERRORS:
 \    begin
 \      fdup [ 10 s>f swap ] literal literal f>=
@@ -466,18 +521,18 @@ true not constant false
 \      fnswap 1+ nfswap
 \    repeat
 \ GOOD COMPROMISE:
-    [ 1 s>f swap ] literal literal ( s-x f-v f-1 )
-    begin
-      fover fover [ 10 s>f swap ] literal literal f* ( s-x f-v f-powerof10 f-v f-10*powerof10 )
-      fdup >r >r ( s-x f-v f-powerof10 f-v f-10*powerof10, R: f-10*powerof10 )
-      f>=
-    while
-      fdrop
-      fnswap 1+ nfswap
-      r> r>
-    repeat
-    r> r> fdrop ( s-x f-v f-powerof10 )
-    f/
+\    [ 1 s>f swap ] literal literal ( s-x f-v f-1 )
+\    begin
+\      fover fover [ 10 s>f swap ] literal literal f* ( s-x f-v f-powerof10 f-v f-10*powerof10 )
+\      fdup >r >r ( s-x f-v f-powerof10 f-v f-10*powerof10, R: f-10*powerof10 )
+\      f>=
+\    while
+\      fdrop
+\      fnswap 1+ nfswap
+\      r> r>
+\    repeat
+\    r> r> fdrop ( s-x f-v f-powerof10 )
+\    f/
 
     \ if it's too small, make it bigger
     begin
