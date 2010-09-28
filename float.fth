@@ -539,6 +539,89 @@ true not constant false
     then
   then ;
 
+\ print f using scientific notation with n digits after the decimal point
+: fsn. ( f n -- )
+  >r ( f, R: n )
+  \ handle zero seperately
+  fdup f0=
+  if
+    fdrop 46 48 emit emit \ prints "0."
+    r> 0 do 48 emit loop \ prints "0" n times
+  else
+    \ first, let's take care of the sign
+    fdup f0<
+    if
+      fnegate \ make it positive
+      45 emit \ print a "-"
+    then
+
+    \ next, we scale the number to be in [1,10)
+    0 nfswap \ the 0 is the x in dragon2 algorithm
+
+    \ if it's too large, make it smaller
+    \ THREE VERSIONS, PICK YOUR POISON
+\ SLOW BUT CLEAN:
+\    begin
+\      fdup [ 10 s>f swap ] literal literal f>=
+\    while
+\      [ 10 s>f swap ] literal literal f/ 
+\      fnswap 1+ nfswap
+\    repeat
+\ FAST AND CLEAN BUT WITH MORE ROUNDING ERRORS:
+\    begin
+\      fdup [ 10 s>f swap ] literal literal f>=
+\    while
+\      [ 1 s>f 10 s>f f/ swap ] literal literal f* 
+\      fnswap 1+ nfswap
+\    repeat
+\ GOOD COMPROMISE:
+    [ 1 s>f swap ] literal literal ( s-x f-v f-1 )
+    begin
+      fover fover [ 10 s>f swap ] literal literal f*
+      fdup >r >r
+      f>=
+    while
+      fdrop
+      fnswap 1+ nfswap
+      r> r>
+    repeat
+    r> r> fdrop ( s-x f-v f-powerof10, R: n )
+    f/
+
+    \ if it's too small, make it bigger
+    begin
+      fdup [ 1 s>f swap ] literal literal f<
+    while
+      [ 10 s>f swap ] literal literal f*
+      fnswap 1- nfswap
+    repeat
+
+    ( s-x f-v , R: n )
+
+    \ the float on the stack is called v' in the dragon2 algorithm
+
+    fdup ffloor f>s emitdigit \ now we can print the first digit
+    46 emit \ the decimal point
+    
+    \ now remove the integer part of v', yeilding M
+    fmod1 ( s-x f-M, R:n )
+
+    r> 0 do
+      [ 10 s>f swap ] literal literal f* \ multiply by 10 get make a new integer
+      fdup ffloor f>s emitdigit \ emit the integer
+      fmod1 \ get rid of it, leaving the remainder
+    loop
+
+    fdrop \ get rid of remainder
+
+    \ x has been waiting patiently at the bottom of the stack this whole time
+    ?dup if
+      69 emit . \ if it's non-zero, print "E" then print x
+    else
+      bl emit \ otherwise, just print a space
+    then
+  then ;
+
 \ COME UP WITH BETTER NAMES FOR NEXT TWO
 \ returns the number that occupies the part of the string from n-location + 1 to the end
 : partnumber ( n-adr n-length n-location -- n )
