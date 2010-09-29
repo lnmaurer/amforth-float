@@ -482,6 +482,15 @@ true not constant false
 : fmod1 ( f -- f )
   fdup floor f- ;
 
+\ round to nearest integer
+: fround ( f -- f )
+  fdup fmod1 [ 1 s>f f2/ ] fliteral f<
+  if
+    floor
+  else
+    ceil
+  then ;
+
 \ print f using scientific notation
 \ this uses the dragon2 algorithm from
 \ "How to print floating point numbers accurately"
