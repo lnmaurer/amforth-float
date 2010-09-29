@@ -666,11 +666,11 @@ true not constant false
   then ;
 
 \ string of form 'integer'.'fractioal'e'exp'
-: >float ( c-addr u-length -- f )
+: string>float ( c-addr u-length -- f )
   \ get exponent first -- 101 is 'e' NEED TO ALSO ACCEPT E,d,D
-  over over 101 extract >r ( adr length, R: exp )
+  101 extract >r ( adr length, R: exp )
   \ next get fractional part -- 46 is '.'
-  over over 46 extract >r ( adr length, R: exp fractional )
+  46 extract >r ( adr length, R: exp fractional )
   -1 partnumber ( integer, R: exp fractional )
   s>f r> s>f ( f-integer f-fractional, R: exp )
 
@@ -684,12 +684,26 @@ true not constant false
   f+ \ combine fractional and integer parts
 
   \ now, shift according to exp
-  r> dup 0<
+  r> dup 0=
   if
-    negate
-    0 do [ 10 s>f ] fliteral f/ loop
+    drop
   else
-    0 do [ 10 s>f ] fliteral f* loop
+    dup 0<
+    if
+      negate
+      0 do [ 10 s>f ] fliteral f/ loop
+    else
+      0 do [ 10 s>f ] fliteral f* loop
+    then
+  then ;
+
+: >float ( n-c-addr u-length -- f true | false)
+  ['] string>float catch
+  0=
+  if
+    true \ no error encounter -- we have a float
+  else
+    drop drop false \ couldn't make a float, clear the two inputs off the stack
   then ;
 
 
