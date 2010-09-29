@@ -266,7 +266,7 @@ true not constant false
 \ CONVERSION
 
 : d>f ( d -- f )
-  0 sigexp>f 23 faddtoexponent ;
+  23 sigexp>f ;
 
 : s>f ( n -- f )
   s>d d>f ;
