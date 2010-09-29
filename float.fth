@@ -67,6 +67,12 @@ marker ->clean
 : f! ( f addr -- )
   swap over ! cell+ ! ;
 
+: (fliteral) ( -- f )
+  r@ 1+ i@ r@ i@ r> 2 + >r ;
+
+: fliteral ( f -- )
+  compile (fliteral) , , ; immediate
+
 \ MISC
 
 true not constant false
@@ -362,23 +368,23 @@ true not constant false
 
 \ makes the exponent zero and returns the old exponent or what the exponent
 \ would have been for subnormal numbers.
-: fzeroexponent ( f -- f n )
-  fdup f0=
-  if \ it's zero, not much to do
-    0
-  else
-    0 nfswap \ will store the number of shifts ( n f )
-
-    \ if it's subnormal, shift it left until it isn't
-    begin
-      fdup frawexponent -127 =
-    while
-      f2* fnswap 1+ nfswap
-    repeat
-
-    fnswap >r ( f, R: n )  
-    fdup fexponent >r 0 fsetexponent r> r> - 
-  then ;
+\ : fzeroexponent ( f -- f n )
+\  fdup f0=
+\  if \ it's zero, not much to do
+\    0
+\  else
+\    0 nfswap \ will store the number of shifts ( n f )
+\
+\    \ if it's subnormal, shift it left until it isn't
+\    begin
+\      fdup frawexponent -127 =
+\    while
+\      f2* fnswap 1+ nfswap
+\    repeat
+\
+\    fnswap >r ( f, R: n )  
+\    fdup fexponent >r 0 fsetexponent r> r> - 
+\  then ;
 
 \ : f/ ( f1 f2 -- f1/f2 )
 \  fdup f0= abort" division by zero "
@@ -412,33 +418,28 @@ true not constant false
 \  fdrop fdrop fdrop r> faddtoexponent
 \  r> if fnegate then ;
 
+: fpreparefordivide ( f -- d n )
+  f>sigexp
+
+  \ get d so that it has a one in the 25th place
+  begin
+    >r dup 4096 < r> swap \ only need to look at upper part of d
+  while
+    flshift
+  repeat ;
+
 : f/ ( f1 f2 -- f1/f2 )
   fdup f0= abort" division by zero "
 
+  \ should the result be negative
   fnegateifneg >r fswap fnegateifneg >r fswap
   r> r> xor >r ( f1 f2, R: flag-negative )
 
-  f>sigexp ( f1 d2 n2, R: negative )
+  fpreparefordivide >r ( f1 d2, R: flag-negative n2 )
 
-  \ get d2 so that it has a one in the 25th place
-  begin
-    >r ( f1 d2, r: negative n2 )
-    dup 4096 <
-    r> swap
-  while
-    flshift
-  repeat
+  fswap fpreparefordivide ( d2 d1 n1, R: negative n2 )
 
-  >r fswap f>sigexp ( d2 d1 n1, R: negative n2 )
-  \ get d1 so that it has a one in the 25th place
-  begin
-    >r
-    dup 4096 <
-    r> swap
-  while
-    flshift
-  repeat
-
+  \ also subtract 5 because everything shifted 5 to left
   r> - 5 - >r fswap ( d1 d2, R: negative n1-n2 )
 
   \ d1 will be known as remainder, d2 as divisor, and n1-n2 as exponent
@@ -465,23 +466,21 @@ true not constant false
   fdrop fdrop fdrop r> sigexp>f
   r> if fnegate then ;
 
-
-
 \ the greatest integer <= the float
 \ e.g. the floor of 3.5 is 3
 \ and the floor of -3.5 is -4
 \ the division in fshifttoexp gets rid of the fractional part
-: ffloor ( f -- f )
+: floor ( f -- f )
   f>sigexp 23 fshifttoexp sigexp>f ;
 
 \ the ceiling of x is -floor(-x)
-: fceil ( f -- f )
-  fnegate ffloor fnegate ;
+: ceil ( f -- f )
+  fnegate floor fnegate ;
 
 \ returns f mod 1 -- basically the fractional part of f
-\ fmod1(f) = f - ffloor(f)
+\ fmod1(f) = f - floor(f)
 : fmod1 ( f -- f )
-  fdup ffloor f- ;
+  fdup floor f- ;
 
 \ print f using scientific notation
 \ this uses the dragon2 algorithm from
@@ -505,59 +504,37 @@ true not constant false
     0 nfswap \ the 0 is the x in dragon2 algorithm
 
     \ if it's too large, make it smaller
-    \ THREE VERSIONS, PICK YOUR POISON
-\ SLOW BUT CLEAN:
     begin
-      fdup [ 10 s>f swap ] literal literal f>=
+      fdup [ 10 s>f ] fliteral f>=
     while
-      [ 10 s>f swap ] literal literal f/ 
+      [ 10 s>f ] fliteral f/ 
       fnswap 1+ nfswap
     repeat
-\ FAST AND CLEAN BUT WITH MORE ROUNDING ERRORS:
-\    begin
-\      fdup [ 10 s>f swap ] literal literal f>=
-\    while
-\      [ 1 s>f 10 s>f f/ swap ] literal literal f* 
-\      fnswap 1+ nfswap
-\    repeat
-\ GOOD COMPROMISE:
-\    [ 1 s>f swap ] literal literal ( s-x f-v f-1 )
-\    begin
-\      fover fover [ 10 s>f swap ] literal literal f* ( s-x f-v f-powerof10 f-v f-10*powerof10 )
-\      fdup >r >r ( s-x f-v f-powerof10 f-v f-10*powerof10, R: f-10*powerof10 )
-\      f>=
-\    while
-\      fdrop
-\      fnswap 1+ nfswap
-\      r> r>
-\    repeat
-\    r> r> fdrop ( s-x f-v f-powerof10 )
-\    f/
 
     \ if it's too small, make it bigger
     begin
-      fdup [ 1 s>f swap ] literal literal f<
+      fdup [ 1 s>f ] fliteral f<
     while
-      [ 10 s>f swap ] literal literal f*
+      [ 10 s>f ] fliteral f*
       fnswap 1- nfswap
     repeat
 
     \ the float on the stack is called v' in the dragon2 algorithm
 
-    fdup ffloor f>s emitdigit \ now we can print the first digit
+    fdup floor f>s emitdigit \ now we can print the first digit
     46 emit \ the decimal point
 
     \ calculate n = p - floor(log2(v')) - 1
     24 \ that's p - 1 since p is 25
-    nfover [ 2 s>f swap ] literal literal f> if 1-
-    nfover [ 4 s>f swap ] literal literal f> if 1-
-    nfover [ 8 s>f swap ] literal literal f> if 1- then then then
+    nfover [ 2 s>f ] fliteral f> if 1-
+    nfover [ 4 s>f ] fliteral f> if 1-
+    nfover [ 8 s>f ] fliteral f> if 1- then then then
     
     \ now the stack is ( s-x f-v' s-n )
 
     \ let's construct M = 2^(-n)/2 = 2^(-n-1)
     negate 1- >r
-    [ 1 s>f swap ] literal literal r> fsetexponent ( s-x f-v' f-M )
+    [ 1 s>f ] fliteral r> fsetexponent ( s-x f-v' f-M )
 
     \ don't care about k in algorithm since we'll just print immediatly
     \ R in algorithm is fractional part of v'
@@ -566,13 +543,13 @@ true not constant false
     \ in dragon2, use B=10 because that's the base we want
     begin
       \ calculate the digit (their U) and move to return stack
-      fdup [ 10 s>f swap ] literal literal f* ffloor f>s >r ( s-x f-M f-R, R: s-U )
+      fdup [ 10 s>f ] fliteral f* floor f>s >r ( s-x f-M f-R, R: s-U )
       \ update R
-      [ 10 s>f swap ] literal literal f* fmod1
+      [ 10 s>f ] fliteral f* fmod1
       \ update M
-      fswap [ 10 s>f swap ] literal literal f* fswap
+      fswap [ 10 s>f ] fliteral f* fswap
       fover fover f<= >r
-      fover [ 1 s>f swap ] literal literal f- fover fnegate f<=
+      fover [ 1 s>f ] fliteral f- fover fnegate f<=
       r> and
     while
       \ output the digit (their U )
@@ -580,7 +557,7 @@ true not constant false
     repeat
 
     \ take care of the final digit (their case statement)
-    r> nfover [ 1 s>f f2/ swap ] literal literal f>
+    r> nfover [ 1 s>f f2/ ] fliteral f>
     if 1+ then
     emitdigit
 
@@ -600,7 +577,8 @@ true not constant false
   \ handle zero seperately
   fdup f0=
   if
-    fdrop 46 48 emit emit \ prints "0."
+    fdrop 46 48 32 emit emit emit \ prints " 0."
+    \ the leading space makes it aligned with any "-" printed
     r> 0 do 48 emit loop \ prints "0" n times
   else
     \ first, let's take care of the sign
@@ -608,46 +586,26 @@ true not constant false
     if
       fnegate \ make it positive
       45 emit \ print a "-"
+    else
+      32 emit \ print a " " so that it's aligned with any "-" printed
     then
 
     \ next, we scale the number to be in [1,10)
     0 nfswap \ the 0 is the x in dragon2 algorithm
 
     \ if it's too large, make it smaller
-    \ THREE VERSIONS, PICK YOUR POISON
-\ SLOW BUT CLEAN:
-\    begin
-\      fdup [ 10 s>f swap ] literal literal f>=
-\    while
-\      [ 10 s>f swap ] literal literal f/ 
-\      fnswap 1+ nfswap
-\    repeat
-\ FAST AND CLEAN BUT WITH MORE ROUNDING ERRORS:
-\    begin
-\      fdup [ 10 s>f swap ] literal literal f>=
-\    while
-\      [ 1 s>f 10 s>f f/ swap ] literal literal f* 
-\      fnswap 1+ nfswap
-\    repeat
-\ GOOD COMPROMISE:
-    [ 1 s>f swap ] literal literal ( s-x f-v f-1 )
     begin
-      fover fover [ 10 s>f swap ] literal literal f*
-      fdup >r >r
-      f>=
+      fdup [ 10 s>f ] fliteral f>=
     while
-      fdrop
+      [ 10 s>f ] fliteral f/ 
       fnswap 1+ nfswap
-      r> r>
     repeat
-    r> r> fdrop ( s-x f-v f-powerof10, R: n )
-    f/
 
     \ if it's too small, make it bigger
     begin
-      fdup [ 1 s>f swap ] literal literal f<
+      fdup [ 1 s>f ] fliteral f<
     while
-      [ 10 s>f swap ] literal literal f*
+      [ 10 s>f ] fliteral f*
       fnswap 1- nfswap
     repeat
 
@@ -655,15 +613,15 @@ true not constant false
 
     \ the float on the stack is called v' in the dragon2 algorithm
 
-    fdup ffloor f>s emitdigit \ now we can print the first digit
+    fdup floor f>s emitdigit \ now we can print the first digit
     46 emit \ the decimal point
     
     \ now remove the integer part of v', yeilding M
     fmod1 ( s-x f-M, R:n )
 
     r> 0 do
-      [ 10 s>f swap ] literal literal f* \ multiply by 10 get make a new integer
-      fdup ffloor f>s emitdigit \ emit the integer
+      [ 10 s>f ] fliteral f* \ multiply by 10 get make a new integer
+      fdup floor f>s emitdigit \ emit the integer
       fmod1 \ get rid of it, leaving the remainder
     loop
 
@@ -709,9 +667,9 @@ true not constant false
 
   \ make f-fractional a fraction
   begin
-    fdup [ 1 s>f swap ] literal literal f>
+    fdup [ 1 s>f ] fliteral f>
   while
-    [ 10 s>f swap ] literal literal f/
+    [ 10 s>f ] fliteral f/
   repeat
   
   f+ \ combine fractional and integer parts
@@ -720,9 +678,9 @@ true not constant false
   r> dup 0<
   if
     negate
-    0 do [ 10 s>f swap ] literal literal f/ loop
+    0 do [ 10 s>f ] fliteral f/ loop
   else
-    0 do [ 10 s>f swap ] literal literal f* loop
+    0 do [ 10 s>f ] fliteral f* loop
   then ;
 
 
