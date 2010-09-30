@@ -39,7 +39,7 @@ F@ yes
 FALIGN
 FALIGNED
 FCONSTANT yes
-FDEPTH maybe
+FDEPTH yes
 FDROP yes
 FDUP yes
 FLITERAL yes

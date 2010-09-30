@@ -745,11 +745,11 @@ true not constant false
 
 \ Add the size in address units of a floating-point number to f-addr1,
 \ giving f-addr2
-: FLOAT+ ( f-addr1 -- f-addr2 )
+: float+ ( f-addr1 -- f-addr2 )
   4 + ;
 
 \ n2 is the size in address units of n1 floating-point numbers
-: FLOATS ( n1 -- n2 )
+: floats ( n1 -- n2 )
   4 * ;
 
 \ again, the next line is for convienence, not nescessity
