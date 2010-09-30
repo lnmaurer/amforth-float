@@ -95,6 +95,32 @@ true not constant false
 : d0< ( d -- flag )
   nip 0< ;
 
+: d10* ( d -- d*10 )
+  10 * ( n-lower n-uppper*10 )
+  swap 10 um* ( n-uppper*10 d-lower*10 )
+  fnswap + ;
+
+: dreversedigits ( dinitial -- dfinal n-digits )
+  0 0 0 >r ( di df, R: digits )
+  begin
+    fover d0= not
+  while
+    fswap 10 ud/mod fnswap ( df di/10 rem, R: digits )
+    >r fswap d10* r> s>d d+ ( di/10 df*10+rem, R: digits )
+    r> 1+ >r \ updated digits
+  repeat
+  r> ;
+
+: dreversedigits2 ( dinitial n-digits -- dfinal )
+  dup 0= if
+    s>f
+  else
+    0 0 fnswap 0 do ( dinitial dfinal )
+      fswap 10 ud/mod fnswap ( dfinal dinitial/10 rem )
+      >r fswap d10* r> s>d d+
+   loop
+  then ;
+
 \ negates d if it's negative and returns a flag saying whether it was negated
 \ or not
 : dnegateifneg ( d -- d flag )
@@ -500,7 +526,7 @@ true not constant false
   \ handle zero seperately
   fdup f0=
   if
-    fdrop 48 46 48 emit emit emit \ prints "0.0"
+    fdrop 32 48 46 48 32 emit emit emit emit emit \ prints "0.0"
   else
     \ first, let's take care of the sign
     fdup f0<
@@ -588,7 +614,7 @@ true not constant false
   if
     fdrop 46 48 32 emit emit emit \ prints " 0."
     \ the leading space makes it aligned with any "-" printed
-    r> 0 do 48 emit loop \ prints "0" n times
+    r> 0 do 48 emit loop 32 emit \ prints "0" n times then a space
   else
     \ first, let's take care of the sign
     fdup f0<
@@ -667,8 +693,15 @@ true not constant false
 
 \ string of form 'integer'.'fractioal'e'exp'
 : string>float ( c-addr u-length -- f )
-  \ get exponent first -- 101 is 'e' NEED TO ALSO ACCEPT E,d,D
-  101 extract >r ( adr length, R: exp )
+  \ get exponent first -- this is the number that follows e, E, d, or D
+  101 extract dup 0= if drop \ 'e'
+  69 extract dup 0= if drop  \ 'E'
+  100 extract dup 0= if drop \ 'd'
+  68 extract dup 0=          \ 'D'
+  then then then
+
+  >r ( adr length, R: exp )
+  
   \ next get fractional part -- 46 is '.'
   46 extract >r ( adr length, R: exp fractional )
   -1 partnumber ( integer, R: exp fractional )
@@ -706,6 +739,18 @@ true not constant false
     drop drop false \ couldn't make a float, clear the two inputs off the stack
   then ;
 
+\ returns the current number of possible FP numbers on the data stack
+: fdepth ( -- n )
+  sp0 sp@ - 4 / ;
+
+\ Add the size in address units of a floating-point number to f-addr1,
+\ giving f-addr2
+: FLOAT+ ( f-addr1 -- f-addr2 )
+  4 + ;
+
+\ n2 is the size in address units of n1 floating-point numbers
+: FLOATS ( n1 -- n2 )
+  4 * ;
 
 \ again, the next line is for convienence, not nescessity
 marker ->afterfloat

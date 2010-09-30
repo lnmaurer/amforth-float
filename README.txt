@@ -24,7 +24,7 @@ see http://lars.nocrew.org/dpans/dpans12.htm
 
 Floating-Point words:
 
->FLOAT
+>FLOAT almost (need new version of amforth to modify NUMBER)
 D>F yes
 F! yes
 F* yes
@@ -39,12 +39,12 @@ F@ yes
 FALIGN
 FALIGNED
 FCONSTANT yes
-FDEPTH
+FDEPTH maybe
 FDROP yes
 FDUP yes
 FLITERAL yes
-FLOAT+ 
-FLOATS
+FLOAT+ yes
+FLOATS yes
 FLOOR yes
 FMAX yes
 FMIN yes
