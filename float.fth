@@ -113,13 +113,19 @@ true not constant false
 
 : dreversedigits2 ( dinitial n-digits -- dfinal )
   dup 0= if
-    s>f
+    drop drop 0 0 \ 0 digits means dfinal = 0
   else
     0 0 fnswap 0 do ( dinitial dfinal )
       fswap 10 ud/mod fnswap ( dfinal dinitial/10 rem )
       >r fswap d10* r> s>d d+
    loop
   then ;
+
+: dtransferdigit ( d1 d2 -- d1*10+rem d2/10 )
+  10 ud/mod ( d1 rem d2/10 )
+  >r >r >r ( d1 R: d2/10 rem )
+  d10* r> s>d d+
+  r> r> ;
 
 \ negates d if it's negative and returns a flag saying whether it was negated
 \ or not
@@ -517,6 +523,17 @@ true not constant false
     ceil
   then ;
 
+\ returns d/10^n where n is the first integer such that 10^n > d
+\ for example, if d is 1234, then this returns .1234
+: d>fraction ( d -- f )
+  d>f
+  begin
+    fdup [ 1 s>f ] fliteral f>
+  while
+    [ 10 s>f ] fliteral f/
+  repeat ;
+
+
 \ print f using scientific notation
 \ this uses the dragon2 algorithm from
 \ "How to print floating point numbers accurately"
@@ -714,7 +731,12 @@ true not constant false
     [ 10 s>f ] fliteral f/
   repeat
   
-  f+ \ combine fractional and integer parts
+  \ combine fractional and integer parts
+  fover f0< if
+    f- \ integer part is negative, so fractional part should be too
+  else
+    f+ \ integer part is positive, so fractional part should be too
+  then
 
   \ now, shift according to exp
   r> dup 0=
