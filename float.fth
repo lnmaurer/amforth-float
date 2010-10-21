@@ -697,30 +697,32 @@ true not constant false
   dup number ( new_adr num, R: previous_value )
   r> rot c! ; ( return the value to its previous place )
 
-: extract ( n-adr n-length c-char -- n-adr n-new-length n-extracted )
+\ the last returned value is true if the charcter was found, and false if not
+: extract ( n-adr n-length c-char -- n-adr n-new-length n-extracted true|false )
   >r over over r> cscan nip ( adr count loc )
   over over = 
   if \ character not found
-    drop 0
+    false
   else \ character found, note that loc becomes new-length
     swap >r ( adr loc, R: length )
     over over r> swap ( adr loc adr length loc )
-    partnumber 
+    partnumber true
   then ;
 
 \ string of form 'integer'.'fractioal'e'exp'
 : string>float ( c-addr u-length -- f )
   \ get exponent first -- this is the number that follows e, E, d, or D
-  101 extract dup 0= if drop \ 'e'
-  69 extract dup 0= if drop  \ 'E'
-  100 extract dup 0= if drop \ 'd'
-  68 extract dup 0=          \ 'D'
-  then then then
+  101 extract not if drop \ 'e'
+  69  extract not if drop \ 'E'
+  100 extract not if drop \ 'd'
+  68  extract not if drop \ 'D'
+    0 \ if you can't find anything, then it's zero
+  then then then then
 
   >r ( adr length, R: exp )
   
   \ next get fractional part -- 46 is '.'
-  46 extract >r ( adr length, R: exp fractional )
+  46 extract not if drop 0 then >r ( adr length, R: exp fractional )
   -1 partnumber ( integer, R: exp fractional )
   s>f r> s>f ( f-integer f-fractional, R: exp )
 
