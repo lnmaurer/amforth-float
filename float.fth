@@ -728,8 +728,10 @@ true not constant false
   s>f r> s>f ( f-integer f-fractional, R: exp num-digits )
 
   \ make f-fractional a fraction
-  r> 0 do [ 10 s>f ] fliteral f/ loop ( f-integer f-fractional, R: exp )
-  
+  r> ?dup 0= not if
+    0 do [ 10 s>f ] fliteral f/ loop
+  then ( f-integer f-fractional, R: exp )
+
   \ combine fractional and integer parts
   fover f0< if
     f- \ integer part is negative, so fractional part should be too
