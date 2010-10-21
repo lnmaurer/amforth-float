@@ -698,40 +698,37 @@ true not constant false
   r> rot c! ; ( return the value to its previous place )
 
 \ the last returned value is true if the charcter was found, and false if not
-: extract ( n-adr n-length c-char -- n-adr n-new-length n-extracted true|false )
+: extract ( n-adr n-length c-char -- n-adr n-new-length n-extracted n-length true|false )
   >r over over r> cscan nip ( adr count loc )
   over over = 
   if \ character not found
-    false
+    0 false
   else \ character found, note that loc becomes new-length
     swap >r ( adr loc, R: length )
     over over r> swap ( adr loc adr length loc )
-    partnumber true
+    over over - 1- >r ( adr loc adr length loc, R: number-of-digits )
+    partnumber r> true
   then ;
 
 \ string of form 'integer'.'fractioal'e'exp'
 : string>float ( c-addr u-length -- f )
   \ get exponent first -- this is the number that follows e, E, d, or D
-  101 extract not if drop \ 'e'
-  69  extract not if drop \ 'E'
-  100 extract not if drop \ 'd'
-  68  extract not if drop \ 'D'
+  101 extract nip not if drop \ 'e'
+  69  extract nip not if drop \ 'E'
+  100 extract nip not if drop \ 'd'
+  68  extract nip not if drop \ 'D'
     0 \ if you can't find anything, then it's zero
   then then then then
 
   >r ( adr length, R: exp )
   
   \ next get fractional part -- 46 is '.'
-  46 extract not if drop 0 then >r ( adr length, R: exp fractional )
-  -1 partnumber ( integer, R: exp fractional )
-  s>f r> s>f ( f-integer f-fractional, R: exp )
+  46 extract swap >r not if drop 0 then >r ( adr length, R: exp num-digits fractional )
+  -1 partnumber ( integer, R: exp num-digits fractional )
+  s>f r> s>f ( f-integer f-fractional, R: exp num-digits )
 
   \ make f-fractional a fraction
-  begin
-    fdup [ 1 s>f ] fliteral f>
-  while
-    [ 10 s>f ] fliteral f/
-  repeat
+  r> 0 do [ 10 s>f ] fliteral f/ loop ( f-integer f-fractional, R: exp )
   
   \ combine fractional and integer parts
   fover f0< if
