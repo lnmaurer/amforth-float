@@ -24,7 +24,7 @@ see http://lars.nocrew.org/dpans/dpans12.htm
 
 Floating-Point words:
 
->FLOAT yes (known bugs: exponent can't start with a '+' -- will be fixed with a new version of amforth that modifies NUMBER)
+>FLOAT yes (known bugs: exponent will be off if there are more digits in the number than can be stored in a double; exponent can't start with a '+' -- will be fixed with a new version of amforth that modifies NUMBER)
 D>F yes
 F! yes
 F* yes
