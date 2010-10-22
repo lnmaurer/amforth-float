@@ -47,6 +47,9 @@ marker ->clean
 : nfover ( f n -- f n f )
   >r fdup r> nfswap ;
 
+: fnover ( n f -- n f n )
+  >r over r> swap ;
+
 : nip ( n1 n2 -- n2 )
   swap drop ;
 
@@ -83,6 +86,12 @@ true not constant false
 : emitdigit ( n -- )
   48 + emit ;
 
+: char>digit ( c-adr -- n )
+  c@ 48 - ( possible-digit )
+  dup 0 < ( pd bool )
+  over 9 > ( pd bool bool )
+  or if abort then ;
+
 \ OPERATORS FOR DOUBLES
 
 : d0= ( d -- flag )
@@ -99,33 +108,6 @@ true not constant false
   10 * ( n-lower n-uppper*10 )
   swap 10 um* ( n-uppper*10 d-lower*10 )
   fnswap + ;
-
-: dreversedigits ( dinitial -- dfinal n-digits )
-  0 0 0 >r ( di df, R: digits )
-  begin
-    fover d0= not
-  while
-    fswap 10 ud/mod fnswap ( df di/10 rem, R: digits )
-    >r fswap d10* r> s>d d+ ( di/10 df*10+rem, R: digits )
-    r> 1+ >r \ updated digits
-  repeat
-  r> ;
-
-: dreversedigits2 ( dinitial n-digits -- dfinal )
-  dup 0= if
-    drop drop 0 0 \ 0 digits means dfinal = 0
-  else
-    0 0 fnswap 0 do ( dinitial dfinal )
-      fswap 10 ud/mod fnswap ( dfinal dinitial/10 rem )
-      >r fswap d10* r> s>d d+
-   loop
-  then ;
-
-: dtransferdigit ( d1 d2 -- d1*10+rem d2/10 )
-  10 ud/mod ( d1 rem d2/10 )
-  >r >r >r ( d1 R: d2/10 rem )
-  d10* r> s>d d+
-  r> r> ;
 
 \ negates d if it's negative and returns a flag saying whether it was negated
 \ or not
@@ -398,58 +380,6 @@ true not constant false
   if fswap then
   fdrop ;
 
-\ makes the exponent zero and returns the old exponent or what the exponent
-\ would have been for subnormal numbers.
-\ : fzeroexponent ( f -- f n )
-\  fdup f0=
-\  if \ it's zero, not much to do
-\    0
-\  else
-\    0 nfswap \ will store the number of shifts ( n f )
-\
-\    \ if it's subnormal, shift it left until it isn't
-\    begin
-\      fdup frawexponent -127 =
-\    while
-\      f2* fnswap 1+ nfswap
-\    repeat
-\
-\    fnswap >r ( f, R: n )  
-\    fdup fexponent >r 0 fsetexponent r> r> - 
-\  then ;
-
-\ : f/ ( f1 f2 -- f1/f2 )
-\  fdup f0= abort" division by zero "
-\
-\  fnegateifneg >r fswap fnegateifneg >r fswap
-\  r> r> xor >r ( f1 f2, R: flag-negative )
-\
-\  fzeroexponent >r ( f1 f2, R: negative n2 )
-\  fswap fzeroexponent r> - >r fswap ( f1 f2, R: negative n1-n2 )
-\  \ f1 will be known as remainder, f2 as divisor, and n1-n2 as exponent
-\  f0 frot frot ( sum remainder divisor, R: negative exponent )
-\  \ [ 0 128 0 sigexp>f ] is better than 0 16256
-\  \ but it gets bit by the double length number in colon definition bug
-\  0 16256 frot frot ( sum toadd remainder divisor, R: negative exponent )
-\
-\  \ floats only have 24 significant digits, but if f2>f1 then first digit is
-\  \ insignificant, so do 25 to be safe
-\  25 0 do 
-\    fover f0= if leave then \ no need to continue if remainder is zero
-\    fover fover f< not
-\    if \ remainder >= than divisor
-\      ftuck f- fswap
-\      >r >r >r >r ( sum toadd, R: negative exponent divisor remainder )
-\      ftuck f+ fswap
-\      r> r> r> r>
-\    then
-\    \ either way, half toadd and divisor
-\    f2/ >r >r >r >r f2/ r> r> r> r>
-\  loop
-\
-\  fdrop fdrop fdrop r> faddtoexponent
-\  r> if fnegate then ;
-
 : fpreparefordivide ( f -- d n )
   f>sigexp
 
@@ -698,60 +628,95 @@ true not constant false
   r> rot c! ; ( return the value to its previous place )
 
 \ the last returned value is true if the charcter was found, and false if not
-: extract ( n-adr n-length c-char -- n-adr n-new-length n-extracted n-length true|false )
+: extract ( n-adr n-length c-char -- n-adr n-new-length n-extracted true|false )
   >r over over r> cscan nip ( adr count loc )
   over over = 
   if \ character not found
-    0 false
+    false
   else \ character found, note that loc becomes new-length
     swap >r ( adr loc, R: length )
     over over r> swap ( adr loc adr length loc )
-    over over - 1- >r ( adr loc adr length loc, R: number-of-digits )
-    partnumber r> true
+    partnumber true
   then ;
+
+\ the plan is to first get the exponent (if there is one)
+\ then we take care of the sign, if any
+\ next, we find the location of the decimal point (if there is one)
+\ and combine that with the exponent to get the equivilent number
+\ if there were no decimal point (e.g. 12.3e-1 = 123e-2)
+\ then we take in the number as a double, ignoring the decimal signficand
+\ and stopping before the double overflows -- since the float only has
+\ 23 bits, a double holds more than enough significant digits
+\ this is converted to a float then we divide or multiply by the appropriate
+\ power of 10 to get the exponent right and restore the sign
 
 \ string of form 'integer'.'fractioal'e'exp'
 : string>float ( c-addr u-length -- f )
   \ get exponent first -- this is the number that follows e, E, d, or D
-  101 extract nip not if drop \ 'e'
-  69  extract nip not if drop \ 'E'
-  100 extract nip not if drop \ 'd'
-  68  extract nip not if drop \ 'D'
+  101 extract not if drop \ 'e'
+  69  extract not if drop \ 'E'
+  100 extract not if drop \ 'd'
+  68  extract not if drop \ 'D'
     0 \ if you can't find anything, then it's zero
   then then then then
 
   >r ( adr length, R: exp )
-  
-  \ next get fractional part -- 46 is '.'
-  46 extract swap >r not if drop 0 then >r ( adr length, R: exp num-digits fractional )
-  -1 partnumber ( integer, R: exp num-digits fractional )
-  s>f r> s>f ( f-integer f-fractional, R: exp num-digits )
 
-  \ make f-fractional a fraction
-  r> ?dup 0= not if
-    0 do [ 10 s>f ] fliteral f/ loop
-  then ( f-integer f-fractional, R: exp )
-
-  \ combine fractional and integer parts
-  fover f0< if
-    f- \ integer part is negative, so fractional part should be too
+  over c@ 45 = if \ starts with negative sign
+    r> true >r >r ( adr length, R: bool-isneg exp)
+    1- swap 1+ swap ( adr+1 length-1, R: bool-isneg exp)
   else
-    f+ \ integer part is positive, so fractional part should be too
+    r> false >r >r
+  then ( adr length, R: bool-isneg exp)
+
+  over c@ 43 = if \ if it's a plus sign, just ignore it
+    1- swap 1+ swap ( adr+1 length-1, R: bool-isneg exp)
   then
 
-  \ now, shift according to exp
-  r> dup 0=
-  if
-    drop
-  else
-    dup 0<
-    if
-      negate
-      0 do [ 10 s>f ] fliteral f/ loop
+  \ look for a '.'
+  over over 46 cscan nip ( adr length decimal-point-location, R: bool-isneg exp)
+  over - \ will yeild 0 if no '.', -1 if '.' after all numbers,
+         \ -2 if one number after, etc.
+  dup 0< if 1+ then \ so add one if it's not 0
+  r> + >r ( adr length, R: bool-isneg new-exp)
+
+  [ 0. ] fliteral fnswap ( adr d-0 length, R: bool-isneg exp)
+
+  0 do ( adr d-0 )
+    fdup [ 214748364. ] fliteral d> if leave then \ d-sum is basically full
+
+    \ get next character
+    fnover i + c@ ( adr d-sum char )
+
+    dup 46 = if \ it's a '.'
+      drop \ don't do anything
     else
-      0 do [ 10 s>f ] fliteral f* loop
+      48 - ( adr d-sum possible-digit )
+      dup 0 < ( adr d-sum pd bool )
+      over 9 > ( adr d-sum pd bool bool )
+      or if abort then \ it's not a digit, abort
+      ( adr d-sum digit )
+      >r d10* r> s>d d+ ( adr d-sum )
     then
-  then ;
+  loop ( adr d-sum, R: bool-isneg exp)
+
+  fnswap drop d>f ( f-sum, R: bool-isneg exp)
+
+  r@ 0= if  \ if exp is 0
+    r> drop \ get rid of exp off return stack
+  else
+    [ 1 s>f ] fliteral
+    r@ abs 0 do
+      [ 10 s>f ] fliteral f*
+    loop
+
+    ( f-sum 10^abs[exp], R: bool-isneg exp )
+
+    r> 0< if f/ else f* then
+  then ( f-num, R: bool-isneg )
+
+  \ take care of negative sign
+  r> if fnegate then ;
 
 : >float ( n-c-addr u-length -- f true | false)
   ['] string>float catch

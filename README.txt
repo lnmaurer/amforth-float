@@ -24,13 +24,13 @@ see http://lars.nocrew.org/dpans/dpans12.htm
 
 Floating-Point words:
 
->FLOAT almost (need new version of amforth to modify NUMBER)
+>FLOAT yes (known bugs: numbers of form '.0', '.00' etc.; exponent can't start with a '+' -- will be fixed with a new version of amforth that modifies NUMBER)
 D>F yes
 F! yes
 F* yes
 F+ yes
 F- yes
-F/ yes
+F/ yes (known bug: dividing zero -- e.g. 0/1)
 F0< yes
 F0= yes
 F< yes
