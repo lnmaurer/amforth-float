@@ -393,40 +393,44 @@ true not constant false
 : f/ ( f1 f2 -- f1/f2 )
   fdup f0= abort" division by zero "
 
-  \ should the result be negative
-  fnegateifneg >r fswap fnegateifneg >r fswap
-  r> r> xor >r ( f1 f2, R: flag-negative )
+  fover f0= if \ if f1 is zero, fpreparefordivide will get in an infinite loop
+    f0 \ so just return 0
+  else
+    \ should the result be negative
+    fnegateifneg >r fswap fnegateifneg >r fswap
+    r> r> xor >r ( f1 f2, R: flag-negative )
 
-  fpreparefordivide >r ( f1 d2, R: flag-negative n2 )
+    fpreparefordivide >r ( f1 d2, R: flag-negative n2 )
 
-  fswap fpreparefordivide ( d2 d1 n1, R: negative n2 )
+    fswap fpreparefordivide ( d2 d1 n1, R: negative n2 )
 
-  \ also subtract 5 because everything shifted 5 to left
-  r> - 5 - >r fswap ( d1 d2, R: negative n1-n2 )
+    \ also subtract 5 because everything shifted 5 to left
+    r> - 5 - >r fswap ( d1 d2, R: negative n1-n2 )
 
-  \ d1 will be known as remainder, d2 as divisor, and n1-n2 as exponent
-  \ put sum on the stack, initialized to zero
-  0 0 frot frot ( sum remainder divisor, R: negative exponent )
-  \ now, put in the thing we'll add
-  0 4096 frot frot ( sum toadd remainder divisor, R: negative exponent )
+    \ d1 will be known as remainder, d2 as divisor, and n1-n2 as exponent
+    \ put sum on the stack, initialized to zero
+    0 0 frot frot ( sum remainder divisor, R: negative exponent )
+    \ now, put in the thing we'll add
+    0 4096 frot frot ( sum toadd remainder divisor, R: negative exponent )
 
-  \ floats only have 24 significant digits, but if d2>d1 then first digit is
-  \ insignificant, so do 26 to be safe
-  26 0 do 
-    fover d0= if leave then \ no need to continue if remainder is zero
-    fover fover d< not
-    if \ remainder >= than divisor
-      ftuck d- fswap
-      >r >r >r >r ( sum toadd, R: negative exponent divisor remainder )
-      ftuck d+ fswap
-      r> r> r> r>
-    then
-    \ either way, half toadd and divisor
-    d2/ >r >r >r >r d2/ r> r> r> r>
-  loop
+    \ floats only have 24 significant digits, but if d2>d1 then first digit is
+    \ insignificant, so do 26 to be safe
+    26 0 do 
+      fover d0= if leave then \ no need to continue if remainder is zero
+      fover fover d< not
+      if \ remainder >= than divisor
+        ftuck d- fswap
+        >r >r >r >r ( sum toadd, R: negative exponent divisor remainder )
+        ftuck d+ fswap
+        r> r> r> r>
+      then
+      \ either way, half toadd and divisor
+      d2/ >r >r >r >r d2/ r> r> r> r>
+    loop
 
-  fdrop fdrop fdrop r> sigexp>f
-  r> if fnegate then ;
+    fdrop fdrop fdrop r> sigexp>f
+    r> if fnegate then
+  then ;
 
 \ the greatest integer <= the float
 \ e.g. the floor of 3.5 is 3
@@ -669,7 +673,7 @@ true not constant false
     r> false >r >r
   then ( adr length, R: bool-isneg exp)
 
-  over c@ 43 = if \ if it's a plus sign, just ignore it
+  over c@ 43 = if \ if it's a plus sign, just ignore it, but reduce string size
     1- swap 1+ swap ( adr+1 length-1, R: bool-isneg exp)
   then
 
