@@ -683,6 +683,9 @@ true not constant false
     fover drop i + c@ ( exp adr bool-after_decimal d-sum char )
     dup 46 = if \ it's a '.'
       drop \ get rid of character
+      fnover if \ we've already encountered a decimal point
+        abort
+      then
       \ we're after the decimal now, so make bool-after_decimal true
       fnswap drop true nfswap ( exp adr bool-after_decimal d-sum )
     else
@@ -725,6 +728,15 @@ true not constant false
 
   \ take care of negative sign
   r> if fnegate then ;
+
+
+: >float ( n-c-addr u-length -- f true | false)
+  ['] string>float catch
+  0= if
+    true \ no error encounter -- we have a float
+  else
+    drop drop false \ couldn't make a float, clear the two inputs off the stack
+ then ;
 
 \ returns the current number of possible FP numbers on the data stack
 : fdepth ( -- n )
