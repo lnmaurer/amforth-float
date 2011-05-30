@@ -3,10 +3,27 @@ amforth-float -- a partially complete floating point wordset for amforth
 amforth.sourceforge.net
 
 This is just a personal project -- I am not involved with the development of
-amforth.
+amforth. However, this library has been included in amforth since version 4.2
+(along with some related libraries like assemly versions of some of the words).
 
 The code requires 'd=', which doesn't seem to be compiled automatically. So
-either add it to dict_appl.inc or uncomment the code for it below.
+either add it to 'dict_appl.inc' or uncomment the code in 'float.fth'.
+
+Having the word 'marker' isn't strictly needed, but it can be useful. If you
+want it, add
+
+.include "words/set-current.asm"
+.include "words/set-order.asm"
+
+to 'dict_appl.inc' when assembling amforth. Then upload 'lib/ans94/marker.frt'.
+
+Finially, if you want the recognizer to work (the code is at the end of
+'float.fth'; it allows you to enter floats just like normal numbers), add
+
+.include "words/n_to_r.asm"
+.include "words/n_r_from.asm"
+
+to 'dict_appl_core.inc'.
 
 This floating point implementation is inspired by the IEEE 754-2008 binary32
 format -- your standard single precision float. I adapted their format to fit
@@ -24,7 +41,7 @@ see http://lars.nocrew.org/dpans/dpans12.htm
 
 Floating-Point words:
 
->FLOAT yes (known bugs: exponent will be off if there are more digits in the number than can be stored in a double; exponent can't start with a '+' -- will be fixed with a new version of amforth that modifies NUMBER)
+>FLOAT yes
 D>F yes
 F! yes
 F* yes
@@ -100,7 +117,19 @@ SFALIGNED
 SFLOAT+
 SFLOATS
 
-All the files that make up this library are copyright 2010 by Leon Maurer.
+Other words in the library:
+FNIP ( f1 f2 -- f2 )
+FTUCK ( f1 f2 -- f2 f1 f2 )
+NFSWAP ( f n -- n f )
+FNSWAP ( n f -- f n )
+NFOVER ( f n -- f n f )
+FNOVER ( n f -- n f n )
+
+The way to remember the FN/NF words is that FN/NF shows the top two items on
+the stack after executing the word. E.g. for FNSWAP, after execution the stack
+will be F N.
+
+All the files that make up this library are copyright 2011 by Leon Maurer.
 
   This program is free software; you can redistribute it and/or
   modify it under the terms of the GNU General Public License

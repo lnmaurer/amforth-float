@@ -624,12 +624,8 @@ true not constant false
 \ COME UP WITH BETTER NAMES FOR NEXT TWO
 \ returns the number that occupies the part of the string from n-location + 1 to the end
 : partnumber ( n-adr n-length n-location -- n )
-  over over - 1- rot drop rot rot + swap ( new_adr new_length )
-  over dup
-  c@ >r ( store the value that was at n-location to the return stack )
-  c! ( store the length there to make a counted string )
-  dup count number swap drop 0= if -13 throw then ( new_adr num, R: previous_value )
-  r> rot c! ; ( return the value to its previous place )
+  swap over - 1- rot rot + 1+ swap ( new_adr new_length )
+  number nip 0= if -13 throw then ;
 
 \ the last returned value is true if the charcter was found, and false if not
 : extract ( n-adr n-length c-char -- n-adr n-new-length n-extracted true|false )
@@ -744,18 +740,23 @@ true not constant false
   4 * ;
 
 \ recognizer is a feature that is available for amforth 4.3 and up
-: rec-float count >float
-   if state @ if postpone fliteral then -1
-   else 0
+: rec-float count >float 
+  if
+    state @ if
+      postpone fliteral
+    then -1
+  else
+    0
+  then 
 ;
 
 : place-rec ( xt -- )
-    get-recognizer
-    dup >r
-    1-  n>r
-    swap
-    nr> drop r> 1+
-    set-recognizer
+  get-recognizer
+  dup >r
+  1-  n>r
+  swap
+  nr> drop r> 1+
+  set-recognizer
 ;
 
 ' rec-float place-rec
