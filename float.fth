@@ -641,14 +641,17 @@ true not constant false
 
 \ the plan is to first get the exponent (if there is one)
 \ then we take care of the sign, if any
-\ next, we find the location of the decimal point (if there is one)
-\ and combine that with the exponent to get the equivilent number
-\ if there were no decimal point (e.g. 12.3e-1 = 123e-2)
-\ then we take in the number as a double, ignoring the decimal signficand
-\ and stopping before the double overflows -- since the float only has
-\ 23 bits, a double holds more than enough significant digits
-\ this is converted to a float then we divide or multiply by the appropriate
-\ power of 10 to get the exponent right and restore the sign
+\ next, we start storing the digits in to a double while keeping track
+\ of the exponent. For example 12.34e will get turned in to the double
+\ 1234, so we need to decriment the exponent by two (one for each digit
+\ after the decimal place) to get the right answer. If the double fills
+\ up, then we stop since the double has more significant digits than a
+\ float has. If the float fills up before we get to the decimal place,
+\ then we have to add one to the exponent for every digit before the
+\ decimal place we miss.
+\ the double is then converted to a float, which we divide or multiply
+\ by the appropriate power of 10 to get the exponent right
+\ finially, we restore the sign
 
 \ string of form 'integer'.'fractioal'e'exp'
 : string>float ( c-addr u-length -- f )
