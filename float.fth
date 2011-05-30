@@ -683,24 +683,31 @@ true not constant false
   >r false nfswap r> ( exp adr bool-after_decimal d-0 length, R: bool-isneg )
 
   0 do ( exp adr bool-after_decimal d-0 )
-    fdup [ 214748364. ] fliteral d> if leave then \ d-sum is basically full, so leave
-
     \ get next character
     fover drop i + c@ ( exp adr bool-after_decimal d-sum char )
-
     dup 46 = if \ it's a '.'
       drop \ get rid of character
       \ we're after the decimal now, so make bool-after_decimal true
       fnswap drop true nfswap ( exp adr bool-after_decimal d-sum )
     else
-      48 - ( exp adr bool-after_decimal d-sum possible-digit )
-      dup 0 < ( exp adr bool-after_decimal d-sum pd bool )
-      over 9 > ( exp adr bool-after_decimal d-sum pd bool bool )
-      or if abort then \ it's not a digit, abort
-      ( exp adr bool-after_decimal d-sum digit )
-      >r d10* r> s>d d+ ( exp adr bool-after_decimal d-sum )
-      fnover if ( exp adr bool-after_decimal d-sum )
-        >r >r >r >r 1- r> r> r> r> \ decriment the exponent by one
+      nfover [ 214748364. ] fliteral d> if \ d-sum can't hold any more
+        drop \ don't care about character
+        fnover not if
+          \ we're before the decimal place, so add one to the exponent
+          >r >r >r >r 1+ r> r> r> r>
+        else
+          leave \ there's nothing left to do if we're after the decimal place
+        then
+      else
+        48 - ( exp adr bool-after_decimal d-sum possible-digit )
+        dup 0 < ( exp adr bool-after_decimal d-sum pd bool )
+        over 9 > ( exp adr bool-after_decimal d-sum pd bool bool )
+        or if abort then \ it's not a digit, abort
+        ( exp adr bool-after_decimal d-sum digit )
+        >r d10* r> s>d d+ ( exp adr bool-after_decimal d-sum )
+        fnover if ( exp adr bool-after_decimal d-sum )
+          >r >r >r >r 1- r> r> r> r> \ decriment the exponent by one
+        then
       then
     then
   loop ( exp adr bool-after_decimal d-sum, R: bool-isneg )
