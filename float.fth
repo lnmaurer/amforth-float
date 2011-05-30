@@ -58,7 +58,7 @@ marker ->clean
 : fconstant ( f -- )
     create , ,
     does>
-    dup i@ swap 1+ i@ swap \ SHOULD BE CELL+?
+    dup @i swap 1+ @i swap \ SHOULD BE CELL+?
 ;
 
 : fvariable ( -- )
@@ -71,7 +71,7 @@ marker ->clean
   swap over ! cell+ ! ;
 
 : (fliteral) ( -- f )
-  r@ 1+ i@ r@ i@ r> 2 + >r ;
+  r@ 1+ @i r@ @i r> 2 + >r ;
 
 : fliteral ( f -- )
   compile (fliteral) , , ; immediate
@@ -98,8 +98,8 @@ true not constant false
   0= swap 0= and ;
 
 \ wasn't installed by default, so add it if you haven't included it
-\ : d= ( d1 d2 -- flag )
-\   d- d0= ;
+: d= ( d1 d2 -- flag )
+  d- d0= ;
 
 : d0< ( d -- flag )
   nip 0< ;
@@ -628,7 +628,7 @@ true not constant false
   over dup
   c@ >r ( store the value that was at n-location to the return stack )
   c! ( store the length there to make a counted string )
-  dup number ( new_adr num, R: previous_value )
+  dup count number swap drop 0= if -13 throw then ( new_adr num, R: previous_value )
   r> rot c! ; ( return the value to its previous place )
 
 \ the last returned value is true if the charcter was found, and false if not
@@ -677,59 +677,51 @@ true not constant false
     1- swap 1+ swap ( adr+1 length-1, R: bool-isneg exp)
   then
 
-  \ look for a '.'
-  over over 46 cscan nip ( adr length decimal-point-location, R: bool-isneg exp)
-  over - \ will yeild 0 if no '.', -1 if '.' after all numbers,
-         \ -2 if one number after, etc.
-  dup 0< if 1+ then \ so add one if it's not 0
-  r> + >r ( adr length, R: bool-isneg new-exp)
+  r> rot rot ( exp adr length, R: bool-isneg )
 
-  [ 0. ] fliteral fnswap ( adr d-0 length, R: bool-isneg exp)
+  [ 0. ] fliteral fnswap ( exp adr d-0 length, R: bool-isneg )
+  >r false nfswap r> ( exp adr bool-after_decimal d-0 length, R: bool-isneg )
 
-  0 do ( adr d-0 )
-    fdup [ 214748364. ] fliteral d> if leave then \ d-sum is basically full
+  0 do ( exp adr bool-after_decimal d-0 )
+    fdup [ 214748364. ] fliteral d> if leave then \ d-sum is basically full, so leave
 
     \ get next character
-    fnover i + c@ ( adr d-sum char )
+    fover drop i + c@ ( exp adr bool-after_decimal d-sum char )
 
     dup 46 = if \ it's a '.'
-      drop \ don't do anything
+      drop \ get rid of character
+      \ we're after the decimal now, so make bool-after_decimal true
+      fnswap drop true nfswap ( exp adr bool-after_decimal d-sum )
     else
-      48 - ( adr d-sum possible-digit )
-      dup 0 < ( adr d-sum pd bool )
-      over 9 > ( adr d-sum pd bool bool )
+      48 - ( exp adr bool-after_decimal d-sum possible-digit )
+      dup 0 < ( exp adr bool-after_decimal d-sum pd bool )
+      over 9 > ( exp adr bool-after_decimal d-sum pd bool bool )
       or if abort then \ it's not a digit, abort
-      ( adr d-sum digit )
-      >r d10* r> s>d d+ ( adr d-sum )
+      ( exp adr bool-after_decimal d-sum digit )
+      >r d10* r> s>d d+ ( exp adr bool-after_decimal d-sum )
+      fnover if ( exp adr bool-after_decimal d-sum )
+        >r >r >r >r 1- r> r> r> r> \ decriment the exponent by one
+      then
     then
-  loop ( adr d-sum, R: bool-isneg exp)
+  loop ( exp adr bool-after_decimal d-sum, R: bool-isneg )
 
-  fnswap drop d>f ( f-sum, R: bool-isneg exp)
+  >r >r drop drop r> r> ( exp d-sum, R: bool-isneg )
 
-  r@ 0= if  \ if exp is 0
-    r> drop \ get rid of exp off return stack
-  else
-    [ 1 s>f ] fliteral
-    r@ abs 0 do
+  d>f fnswap ( f-sum exp, R: bool-isneg )
+
+  ?dup if \ if the exponent isn't zero, adjust the float to match the exp
+    [ 1 s>f ] fliteral ( f-sum exp f-1)
+    fnover abs 0 do
       [ 10 s>f ] fliteral f*
     loop
 
-    ( f-sum 10^abs[exp], R: bool-isneg exp )
+    ( f-sum exp 10^abs[exp], R: bool-isneg )
 
-    r> 0< if f/ else f* then
+    fnswap 0< if f/ else f* then
   then ( f-num, R: bool-isneg )
 
   \ take care of negative sign
   r> if fnegate then ;
-
-: >float ( n-c-addr u-length -- f true | false)
-  ['] string>float catch
-  0=
-  if
-    true \ no error encounter -- we have a float
-  else
-    drop drop false \ couldn't make a float, clear the two inputs off the stack
-  then ;
 
 \ returns the current number of possible FP numbers on the data stack
 : fdepth ( -- n )
@@ -743,6 +735,23 @@ true not constant false
 \ n2 is the size in address units of n1 floating-point numbers
 : floats ( n1 -- n2 )
   4 * ;
+
+\ recognizer is a feature that is available for amforth 4.3 and up
+: rec-float count >float
+   if state @ if postpone fliteral then -1
+   else 0
+;
+
+: place-rec ( xt -- )
+    get-recognizer
+    dup >r
+    1-  n>r
+    swap
+    nr> drop r> 1+
+    set-recognizer
+;
+
+' rec-float place-rec
 
 \ again, the next line is for convienence, not nescessity
 marker ->afterfloat
