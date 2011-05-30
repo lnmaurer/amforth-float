@@ -23,7 +23,7 @@ Finially, if you want the recognizer to work (the code is at the end of
 .include "words/n_to_r.asm"
 .include "words/n_r_from.asm"
 
-to 'dict_appl_core.inc'.
+to 'dict_appl_core.inc'. Then upload 'lib/ans94/postpone.frt'.
 
 This floating point implementation is inspired by the IEEE 754-2008 binary32
 format -- your standard single precision float. I adapted their format to fit

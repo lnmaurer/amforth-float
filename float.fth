@@ -753,13 +753,14 @@ true not constant false
 \ n2 is the size in address units of n1 floating-point numbers
 : floats ( n1 -- n2 )
   4 * ;
-
+ 
 \ recognizer is a feature that is available for amforth 4.3 and up
 : rec-float count >float 
   if
     state @ if
       postpone fliteral
-    then -1
+    then
+    -1
   else
     0
   then 
