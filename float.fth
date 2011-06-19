@@ -76,21 +76,18 @@ marker ->clean
 : fliteral ( f -- )
   compile (fliteral) , , ; immediate
 
-\ MISC
+\ USEFUL CONSTANTS
 
 true not constant false
 
-\ return +0
-0 0 fconstant f0
+0 0 fconstant f0 \ 0.0
+0 16256 fconstant f1 \ 1.0
+0 16672 fconstant f10 \ 10.0
 
-: emitdigit ( n -- )
-  48 + emit ;
+\ OPERATORS FOR SIGNLES
 
-: char>digit ( c-adr -- n )
-  c@ 48 - ( possible-digit )
-  dup 0 < ( pd bool )
-  over 9 > ( pd bool bool )
-  or if abort then ;
+: >= ( n1 n2 -- f)
+  over over > >r = r> or ;
 
 \ OPERATORS FOR DOUBLES
 
@@ -220,14 +217,6 @@ true not constant false
   else
     flshiftn
   then ;
-
-\ shifts significand until there is a 1 in the 'n-digit' digit -- the first
-\ digit corresponds to n-digit = 0
-\ INCOMPLETE
-: fshifttopos ( d-significand n-exponent n-digit -- d n )
-  >r 0 0 r> 0 ( d-significand n-exponent d-0 n-digit n-0 -- d n )
-
-  ;
 
 : sigexp>f ( d-significand n-exponent -- f )
 \ the plan is to first make the signficand positive and then shift it so that
@@ -462,18 +451,112 @@ true not constant false
 : d>fraction ( d -- f )
   d>f
   begin
-    fdup [ 1 s>f ] fliteral f>
+    fdup f1 f>
   while
-    [ 10 s>f ] fliteral f/
+    f10 f/
   repeat ;
 
+: f10^n ( n -- f-10^n )
+  f1 ( n f )
+  fnover 0= if \ n is zero, so just return the 1.0 we have
+    fnswap drop
+  else
+    fnover abs 0 do f10 f* loop ( n f-10^|n| )
+    fnswap 0 < if
+      f1 fswap f/
+    then
+  then
+;
 
+\ finds the integer n-steps with the smallest magnitude such that
+\ f > 10^n-steps where n-steps = n * n-stepsize for some integer n
+\ for exaple "3 .123 smallerpowerof10" yeilds n-steps=3 and f-10^n-steps=10^-3
+: smallerpowerof10 ( n-stepsize f  -- n-steps f-10^n-steps )
+  0 nfswap f1 fswap ( n-stepsize n-steps f-comparison f )
+
+  \ first, we increase comparison until it's too large
+  begin
+    fover fover f< \ is f-comparison < f
+  while
+    >r >r >r >r ( n-stepsize n-steps, R: f f-comparison )
+    over + \ add n-stepsize to n-steps
+    over f10^n r> r> f* \ multiply f-comparison by 10^n-stepsize
+    r> r>
+  repeat
+    
+  \ then we divide until it's too small
+  begin
+    fover fover f> \ is f-comparison > f
+  while
+    >r >r >r >r ( n-stepsize n-steps, R: f f-comparison )
+    over - \ subtract n-stepsize from n-steps
+    over f10^n r> r> fswap f/ \ divide f-comparison by 10^n-stepsize
+    r> r>
+  repeat
+
+  fdrop >r >r >r drop r> r> r>
+;
+
+\ INPUT AND OUTPUT
+
+
+\ FIRST, SOME HELPER WORDS
+\ if f is negative, negate it and emit a minus sign
+: takecareofsign ( f -- |f|)
+  fdup f0<
+  if
+    fnegate \ make it positive
+    45 emit \ print a "-"
+  then
+;
+
+: emitdigit ( n -- )
+  48 + emit ;
+
+: char>digit ( c-adr -- n )
+  c@ 48 - ( possible-digit )
+  dup 0 < ( pd bool )
+  over 9 > ( pd bool bool )
+  or if abort then ;
+
+\ f is a float in [1.0,10); this word emits the digit in the
+\ ones place and returns the fractional part
+: femitdigit ( f -- f-remainder )
+  fdup floor f>s emitdigit \ emit the integer
+  fmod1 \ get rid of it, leaving the remainder
+;
+
+\ f is a float in [1.0,10); this word emits 'n' digits and returns the remainder
+: fprintdigits ( f n -- f-remainder )
+  0 do femitdigit f10 f* loop
+;
+
+\ prints out 'n' zeros
+: emitnzeros ( n -- )
+  ?dup if \ only go in to loop if we don't want to print zero '0's
+    0 do 48 emit loop
+  then
+;
+
+\ this stores how many digits will be printed by F., FE., and FS.
+\ (EVENTUALLY) if it's set to zero, then the word will choose how many digits to print
+\ using the dragon2 algorithm, for now, FSD. does that
+6 constant precision
+
+: set-precision ( u -- )
+  abs [ ' precision 1+ ] literal !i ;
+
+\ NOW, FOR THE REAL OUTPUT WORDS
+
+\ TODO: WRITE FD.NO-SPACE WORD AND THEN WRITE FSD. USING IT; ALSO WRITE FED. AND FD.
+\ AND INTEGRATE THEM WITH FS., FE., AND F. SO THAT THE 'D' VERSIONS ARE CALLED IF
+\ PRECESION IS ZERO
 \ print f using scientific notation
-\ this uses the dragon2 algorithm from
+\ using the dragon2 algorithm from
 \ "How to print floating point numbers accurately"
 \ by Steele and White
 \ in our implimentation, their P=25
-: fs. ( f -- )
+: fsd. ( f -- )
   \ handle zero seperately
   fdup f0=
   if
@@ -491,17 +574,17 @@ true not constant false
 
     \ if it's too large, make it smaller
     begin
-      fdup [ 10 s>f ] fliteral f>=
+      fdup f10 f>=
     while
-      [ 10 s>f ] fliteral f/ 
+      f10 f/ 
       fnswap 1+ nfswap
     repeat
 
     \ if it's too small, make it bigger
     begin
-      fdup [ 1 s>f ] fliteral f<
+      fdup f1 f<
     while
-      [ 10 s>f ] fliteral f*
+      f10 f*
       fnswap 1- nfswap
     repeat
 
@@ -520,7 +603,7 @@ true not constant false
 
     \ let's construct M = 2^(-n)/2 = 2^(-n-1)
     negate 1- >r
-    [ 1 s>f ] fliteral r> fsetexponent ( s-x f-v' f-M )
+    f1 r> fsetexponent ( s-x f-v' f-M )
 
     \ don't care about k in algorithm since we'll just print immediatly
     \ R in algorithm is fractional part of v'
@@ -529,13 +612,13 @@ true not constant false
     \ in dragon2, use B=10 because that's the base we want
     begin
       \ calculate the digit (their U) and move to return stack
-      fdup [ 10 s>f ] fliteral f* floor f>s >r ( s-x f-M f-R, R: s-U )
+      fdup f10 f* floor f>s >r ( s-x f-M f-R, R: s-U )
       \ update R
-      [ 10 s>f ] fliteral f* fmod1
+      f10 f* fmod1
       \ update M
-      fswap [ 10 s>f ] fliteral f* fswap
+      fswap f10 f* fswap
       fover fover f<= >r
-      fover [ 1 s>f ] fliteral f- fover fnegate f<=
+      fover f1 f- fover fnegate f<=
       r> and
     while
       \ output the digit (their U )
@@ -557,69 +640,71 @@ true not constant false
     then
   then ;
 
-\ print f using scientific notation with n digits after the decimal point
-: fsn. ( f n -- )
-  >r ( f, R: n )
+: f.no-space ( f -- )
   \ handle zero seperately
   fdup f0=
   if
-    fdrop 46 48 32 emit emit emit \ prints " 0."
-    \ the leading space makes it aligned with any "-" printed
-    r> 0 do 48 emit loop 32 emit \ prints "0" n times then a space
+    fdrop 46 48 emit emit \ prints "0."
+    precision 1- emitnzeros \ prints "0" precision-1 times
   else
-    \ first, let's take care of the sign
-    fdup f0<
-    if
-      fnegate \ make it positive
-      45 emit \ print a "-"
-    else
-      32 emit \ print a " " so that it's aligned with any "-" printed
+    takecareofsign \ we're now working with a positive number
+    1 nfover smallerpowerof10 fnswap ( f f-10^n-steps n-steps )
+    dup 0 <
+    if \ the number is less than 1.0, so print "0." and then enough leading zeros
+      46 48 emit emit \ prints "0."
+      abs 1- emitnzeros \ print n-steps - 1 leading zeros
+      f/ \ f/f-10^n-steps is a number in [1.0,10)
+      \ print out the right number of digits
+      precision fprintdigits fdrop
+    else \ f is greather than 1.0
+      dup 1+ precision >=
+      if \ everything we need to print is in front of the decimal place
+	>r ( f f-10^n-steps, R: n-steps )
+	f/ precision fprintdigits fdrop r> ( n-steps )
+	precision - 1+ emitnzeros \ print n-steps - precision + 1 trailing zeros
+	46 emit \ finially, print a '.' for good measure
+      else \ last case: we have to print some before and some after the decimal place
+	>r f/ ( f/f-10^n-steps, R: n-steps )
+	r@ 1+ fprintdigits \ print the digits before the decimal place
+	46 emit \ print a '.'
+	precision r> - 1- fprintdigits fdrop \ print digits after decimal place
+      then
     then
+  then
+;
 
-    \ next, we scale the number to be in [1,10)
-    0 nfswap \ the 0 is the x in dragon2 algorithm
+: f. ( f -- )
+  f.no-space bl emit ;
 
-    \ if it's too large, make it smaller
-    begin
-      fdup [ 10 s>f ] fliteral f>=
-    while
-      [ 10 s>f ] fliteral f/ 
-      fnswap 1+ nfswap
-    repeat
+\ print a float with engineering notation
+: fe. ( f -- )
+  \ handle zero seperately
+  fdup f0=
+  if
+    f. \ f. prints zero the same way fe. would
+  else
+    takecareofsign
+    fdup 3 nfswap smallerpowerof10 ( f n-steps f-10^n-steps )
+    fnswap >r f/ f.no-space \ normalize the number and print it
+    69 emit r> . \ print the exponent
+  then
+;
 
-    \ if it's too small, make it bigger
-    begin
-      fdup [ 1 s>f ] fliteral f<
-    while
-      [ 10 s>f ] fliteral f*
-      fnswap 1- nfswap
-    repeat
+\ print f using scientific notation
+: fs. ( f -- )
+  \ handle zero seperately
+  fdup f0=
+  if
+    f. \ f. prints zero the same way fe. would
+  else
+    takecareofsign
+    fdup 1 nfswap smallerpowerof10 ( f n-steps f-10^n-steps )
+    fnswap >r f/ f.no-space \ normalize the number and print it
+    69 emit r> . \ print the exponent
+  then
+;
 
-    ( s-x f-v , R: n )
-
-    \ the float on the stack is called v' in the dragon2 algorithm
-
-    fdup floor f>s emitdigit \ now we can print the first digit
-    46 emit \ the decimal point
-    
-    \ now remove the integer part of v', yeilding M
-    fmod1 ( s-x f-M, R:n )
-
-    r> 0 do
-      [ 10 s>f ] fliteral f* \ multiply by 10 get make a new integer
-      fdup floor f>s emitdigit \ emit the integer
-      fmod1 \ get rid of it, leaving the remainder
-    loop
-
-    fdrop \ get rid of remainder
-
-    \ x has been waiting patiently at the bottom of the stack this whole time
-    ?dup if
-      69 emit . \ if it's non-zero, print "E" then print x
-    else
-      bl emit \ otherwise, just print a space
-    then
-  then ;
+\ NOW, FOR INPUT, HELPER WORDS FIRST
 
 \ COME UP WITH BETTER NAMES FOR NEXT TWO
 \ returns the number that occupies the part of the string from n-location + 1 to the end
@@ -718,16 +803,9 @@ true not constant false
 
   d>f fnswap ( f-sum exp, R: bool-isneg )
 
-  ?dup if \ if the exponent isn't zero, adjust the float to match the exp
-    [ 1 s>f ] fliteral ( f-sum exp f-1)
-    fnover abs 0 do
-      [ 10 s>f ] fliteral f*
-    loop
-
-    ( f-sum exp 10^abs[exp], R: bool-isneg )
-
-    fnswap 0< if f/ else f* then
-  then ( f-num, R: bool-isneg )
+  \ next, take care of the exponent
+  f10^n f* \ take care of the exponent
+  ( f, R: bool-isneg )
 
   \ take care of negative sign
   r> if fnegate then ;
@@ -740,6 +818,8 @@ true not constant false
   else
     drop drop false \ couldn't make a float, clear the two inputs off the stack
  then ;
+
+\ OTHER WORDS FROM THE ANS94 STANDARD
 
 \ returns the current number of possible FP numbers on the data stack
 : fdepth ( -- n )
@@ -754,6 +834,8 @@ true not constant false
 : floats ( n1 -- n2 )
   4 * ;
  
+\ WORDS TO SET UP THE RECOGNIZER
+
 \ recognizer is a feature that is available for amforth 4.3 and up
 : rec-float count >float 
   if

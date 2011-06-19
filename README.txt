@@ -82,7 +82,7 @@ DFALIGNED
 DFLOAT+
 DFLOATS
 F**
-F.
+F. yes
 FABS yes
 FACOS
 FACOSH
@@ -94,7 +94,7 @@ FATAN2
 FATANH
 FCOS
 FCOSH
-FE.
+FE. yes
 FEXP
 FEXPM1
 FLN
@@ -108,8 +108,8 @@ FSQRT
 FTAN
 FTANH
 F~
-PRECISION
-SET-PRECISION 
+PRECISION yes
+SET-PRECISION yes
 SF! 
 SF@
 SFALIGN
@@ -117,13 +117,21 @@ SFALIGNED
 SFLOAT+
 SFLOATS
 
-Other words in the library:
+Other words in the library that you may find useful (there are many words in there that are helper words and you'll probably have no use for):
 FNIP ( f1 f2 -- f2 )
 FTUCK ( f1 f2 -- f2 f1 f2 )
 NFSWAP ( f n -- n f )
 FNSWAP ( n f -- f n )
 NFOVER ( f n -- f n f )
 FNOVER ( n f -- n f n )
+F10^N  ( n -- f-10^n )
+S>F ( n -- f )
+F>S ( f -- n )
+F0 ( -- f-0 ) returns a float equal to zero
+F1 ( -- f-1 )
+F10 ( -- f-10 )
+FSD. ( f -- ) prints the float in scientific notation using the dragon2 algorithm, which automatically decides how many digits to print
+>= ( n1 n2 -- flag ) the flag is true if n1 >= n2 and false otherwise
 
 The way to remember the FN/NF words is that FN/NF shows the top two items on
 the stack after executing the word. E.g. for FNSWAP, after execution the stack
