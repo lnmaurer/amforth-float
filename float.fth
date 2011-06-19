@@ -200,14 +200,14 @@ true not constant false
 
 \ rshifts n times
 : frshiftn ( d-significand n-exponent n-times -- d n )
-  dup 0> if 0 do frshift loop else drop then ;
+  ?dup 0> if 0 do frshift loop then ;
 
 \ like rshift, but in other direction
 : flshift ( d-significand n-exponent -- d n )
   1- >r d2* r> ;
 
 : flshiftn ( d-significand n-exponent n-times -- d n )
-  dup 0> if 0 do flshift loop else drop then ;
+  ?dup 0> if 0 do flshift loop then ;
 
 \ shifts until the exponent is the desired value
 : fshifttoexp ( d-significand n-exponent n-desired-exponent -- d n )
@@ -299,7 +299,7 @@ true not constant false
 : fabs ( f -- |f| )
   fdup f0< if fnegate then ;
 
-\ strict equality -- no rangle for wiggle room
+\ strict equality -- no range for wiggle room
 : f= ( f1 f2 -- flag )
   f>sigexp >r fswap f>sigexp >r d= r> r> = and ;
 
@@ -421,6 +421,24 @@ true not constant false
     r> if fnegate then
   then ;
 
+\ from the standard:
+\ If f3 is positive, flag is |f1-f2| < f3
+\ If f3 is zero, this is the same as f1 f2 f=
+\ If f3 is negative, flag is |f1-f2| < |f3|*(|f1|+|f2|)
+: f~ ( f1 f2 f3 -- flag )
+  fdup f0=
+  if
+    fdrop f=
+  else
+    fdup f0<
+    if
+      fabs >r >r ( f1 f2, R: |f3|)
+      fover fabs fover fabs f+ r> r> f* ( f1 f2 |f3|*[|f1|+|f2|] )
+    then
+    >r >r f- fabs r> r> f<
+  then
+;
+
 \ the greatest integer <= the float
 \ e.g. the floor of 3.5 is 3
 \ and the floor of -3.5 is -4
@@ -445,16 +463,6 @@ true not constant false
   else
     ceil
   then ;
-
-\ returns d/10^n where n is the first integer such that 10^n > d
-\ for example, if d is 1234, then this returns .1234
-: d>fraction ( d -- f )
-  d>f
-  begin
-    fdup f1 f>
-  while
-    f10 f/
-  repeat ;
 
 : f10^n ( n -- f-10^n )
   f1 ( n f )
@@ -500,7 +508,7 @@ true not constant false
 \ INPUT AND OUTPUT
 
 
-\ FIRST, SOME HELPER WORDS
+\ FIRST, SOME OUTPUT HELPER WORDS
 \ if f is negative, negate it and emit a minus sign
 : takecareofsign ( f -- |f|)
   fdup f0<
@@ -512,12 +520,6 @@ true not constant false
 
 : emitdigit ( n -- )
   48 + emit ;
-
-: char>digit ( c-adr -- n )
-  c@ 48 - ( possible-digit )
-  dup 0 < ( pd bool )
-  over 9 > ( pd bool bool )
-  or if abort then ;
 
 \ f is a float in [1.0,10); this word emits the digit in the
 \ ones place and returns the fractional part
@@ -545,6 +547,16 @@ true not constant false
 
 : set-precision ( u -- )
   abs [ ' precision 1+ ] literal !i ;
+
+\ returns f such that the PRECISIONth digit has been rounded
+\ f needs to be in the range [1.0, 10.0)
+: roundtoprecision ( f -- f )
+  precision 1- f10^n f* \ shift so that PRECISION digits are in the integer part
+  fround \ round the number
+  [ 9 s>f f10 f/ ] fliteral fover f0<
+  if f- else f+ then \ put something in the next digit to get around later rounding errors
+  precision 1- f10^n f/ \ shift the number back to where it was initially
+;
 
 \ NOW, FOR THE REAL OUTPUT WORDS
 
@@ -649,22 +661,23 @@ true not constant false
   else
     takecareofsign \ we're now working with a positive number
     1 nfover smallerpowerof10 fnswap ( f f-10^n-steps n-steps )
+    \ f/10^n-steps is a number in [1.0,10), roundtoprecision correctly rounds it
+    >r f/ roundtoprecision r> ( f/10^n-steps n-steps )
     dup 0 <
     if \ the number is less than 1.0, so print "0." and then enough leading zeros
       46 48 emit emit \ prints "0."
       abs 1- emitnzeros \ print n-steps - 1 leading zeros
-      f/ \ f/f-10^n-steps is a number in [1.0,10)
       \ print out the right number of digits
       precision fprintdigits fdrop
     else \ f is greather than 1.0
       dup 1+ precision >=
       if \ everything we need to print is in front of the decimal place
-	>r ( f f-10^n-steps, R: n-steps )
-	f/ precision fprintdigits fdrop r> ( n-steps )
+	>r ( f/10^n-steps, R: n-steps )
+	precision fprintdigits fdrop r> ( n-steps )
 	precision - 1+ emitnzeros \ print n-steps - precision + 1 trailing zeros
 	46 emit \ finially, print a '.' for good measure
       else \ last case: we have to print some before and some after the decimal place
-	>r f/ ( f/f-10^n-steps, R: n-steps )
+	>r ( f/f-10^n-steps, R: n-steps )
 	r@ 1+ fprintdigits \ print the digits before the decimal place
 	46 emit \ print a '.'
 	precision r> - 1- fprintdigits fdrop \ print digits after decimal place
@@ -695,7 +708,7 @@ true not constant false
   \ handle zero seperately
   fdup f0=
   if
-    f. \ f. prints zero the same way fe. would
+    f. \ f. prints zero the same way fs. would
   else
     takecareofsign
     fdup 1 nfswap smallerpowerof10 ( f n-steps f-10^n-steps )
