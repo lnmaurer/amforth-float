@@ -706,7 +706,7 @@ true not constant false
   if
     f. \ f. prints zero the same way fe. would
   else
-    roundtoprecision
+    takecareofsign roundtoprecision
     fdup 3 nfswap smallerpowerof10 ( f n-steps f-10^n-steps )
     fnswap >r f/ f.no-space \ normalize the number and print it
     69 emit r> . \ print the exponent
@@ -720,7 +720,7 @@ true not constant false
   if
     f. \ f. prints zero the same way fs. would
   else
-    roundtoprecision
+    takecareofsign roundtoprecision
     fdup 1 nfswap smallerpowerof10 ( f n-steps f-10^n-steps )
     fnswap >r f/ f.no-space \ normalize the number and print it
     69 emit r> . \ print the exponent
