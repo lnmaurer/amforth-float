@@ -83,6 +83,7 @@ true not constant false
 0 0 fconstant f0 \ 0.0
 0 16256 fconstant f1 \ 1.0
 0 16672 fconstant f10 \ 10.0
+0 16128 fconstant f0.5
 
 \ OPERATORS FOR SIGNLES
 
@@ -293,11 +294,15 @@ true not constant false
 : fnegate ( f -- -f )
   fdup fsign negate fsetsign ;
 
-: fnegateifneg ( d -- d flag )
+: fnegateifneg ( f -- f flag )
   fdup f0< if fnegate true else false then ;
 
+: negateiftrue ( f flag -- f )
+  if fnegate then
+;
+
 : fabs ( f -- |f| )
-  fdup f0< if fnegate then ;
+  fdup f0< negateiftrue ;
 
 \ strict equality -- no range for wiggle room
 : f= ( f1 f2 -- flag )
@@ -418,7 +423,7 @@ true not constant false
     loop
 
     fdrop fdrop fdrop r> sigexp>f
-    r> if fnegate then
+    r> negateiftrue
   then ;
 
 \ from the standard:
@@ -457,7 +462,7 @@ true not constant false
 
 \ round to nearest integer
 : fround ( f -- f )
-  fdup fmod1 [ 1 s>f f2/ ] fliteral f<
+  fdup fmod1 f0.5 f<
   if
     floor
   else
@@ -479,6 +484,7 @@ true not constant false
 \ finds the integer n-steps with the smallest magnitude such that
 \ f > 10^n-steps where n-steps = n * n-stepsize for some integer n
 \ for exaple "3 .123 smallerpowerof10" yeilds n-steps=3 and f-10^n-steps=10^-3
+\ note that f must be strictly greather than zero
 : smallerpowerof10 ( n-stepsize f  -- n-steps f-10^n-steps )
   0 nfswap f1 fswap ( n-stepsize n-steps f-comparison f )
 
@@ -549,13 +555,16 @@ true not constant false
   abs [ ' precision 1+ ] literal !i ;
 
 \ returns f such that the PRECISIONth digit has been rounded
-\ f needs to be in the range [1.0, 10.0)
 : roundtoprecision ( f -- f )
+  fnegateifneg >r \ remove sign and store it on the stack
+  1 nfover smallerpowerof10 fnswap >r f/ \ scale f to be in the range the range [1.0, 10.0)
   precision 1- f10^n f* \ shift so that PRECISION digits are in the integer part
   fround \ round the number
-  [ 9 s>f f10 f/ ] fliteral fover f0<
+  f0.5 fover f0<
   if f- else f+ then \ put something in the next digit to get around later rounding errors
   precision 1- f10^n f/ \ shift the number back to where it was initially
+  r> f10^n f* \ scale f back to its original size
+  r> negateiftrue \ restore sign
 ;
 
 \ NOW, FOR THE REAL OUTPUT WORDS
@@ -638,7 +647,7 @@ true not constant false
     repeat
 
     \ take care of the final digit (their case statement)
-    r> nfover [ 1 s>f f2/ ] fliteral f>
+    r> nfover f0.5 f>
     if 1+ then
     emitdigit
 
@@ -652,6 +661,7 @@ true not constant false
     then
   then ;
 
+\ note that this doesn't do any rounding
 : f.no-space ( f -- )
   \ handle zero seperately
   fdup f0=
@@ -661,8 +671,8 @@ true not constant false
   else
     takecareofsign \ we're now working with a positive number
     1 nfover smallerpowerof10 fnswap ( f f-10^n-steps n-steps )
-    \ f/10^n-steps is a number in [1.0,10), roundtoprecision correctly rounds it
-    >r f/ roundtoprecision r> ( f/10^n-steps n-steps )
+    \ f/10^n-steps is a number in [1.0,10)
+    >r f/ r> ( f/10^n-steps n-steps )
     dup 0 <
     if \ the number is less than 1.0, so print "0." and then enough leading zeros
       46 48 emit emit \ prints "0."
@@ -687,7 +697,7 @@ true not constant false
 ;
 
 : f. ( f -- )
-  f.no-space bl emit ;
+  roundtoprecision f.no-space bl emit ;
 
 \ print a float with engineering notation
 : fe. ( f -- )
@@ -696,7 +706,7 @@ true not constant false
   if
     f. \ f. prints zero the same way fe. would
   else
-    takecareofsign
+    roundtoprecision
     fdup 3 nfswap smallerpowerof10 ( f n-steps f-10^n-steps )
     fnswap >r f/ f.no-space \ normalize the number and print it
     69 emit r> . \ print the exponent
@@ -710,7 +720,7 @@ true not constant false
   if
     f. \ f. prints zero the same way fs. would
   else
-    takecareofsign
+    roundtoprecision
     fdup 1 nfswap smallerpowerof10 ( f n-steps f-10^n-steps )
     fnswap >r f/ f.no-space \ normalize the number and print it
     69 emit r> . \ print the exponent
@@ -821,7 +831,7 @@ true not constant false
   ( f, R: bool-isneg )
 
   \ take care of negative sign
-  r> if fnegate then ;
+  r> negateiftrue ;
 
 
 : >float ( n-c-addr u-length -- f true | false)
