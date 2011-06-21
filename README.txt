@@ -148,6 +148,11 @@ Other words in the library that you may find useful but aren't part of the stand
   F>S ( f -- n )
 -float display:
   FSD. ( f -- ) prints the float in scientific notation using the dragon2 algorithm, which automatically decides how many digits to print
+  FEE. ( f -- n) prints out the mantissa in engineering notation but leaves the exponent on the stack
+  SI. ( n -- ) prints the SI prefixes for the exponent on the stack
+    Note: these last two can be used together to print out numbers with SI prefixes for example:
+      > 555.66e5 fee. si.
+      55.57M ok
 -double words
   D0= ( d -- flag )
   D= ( d1 d2 -- flag )

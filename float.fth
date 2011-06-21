@@ -727,6 +727,51 @@ true not constant false
   then
 ;
 
+\ prints out the mantissa in engineering notation but leaves the exponent on the stack
+: fee. ( f -- n-exponent )
+  \ handle zero seperately
+  fdup f0=
+  if
+    f. \ f. prints zero the same way fe. would
+    0 \ leave zero on TOS
+  else
+    takecareofsign roundtoprecision
+    fdup 3 nfswap smallerpowerof10 ( f n-steps f-10^n-steps )
+    fnswap >r f/ f.no-space \ normalize the number and print it
+    r> \ leave the exponent on TOS
+  then
+;
+
+\ NOTE: THE FOLLOWING WILL BE REWRITTEN MORE CLEANLY LATER
+\ prints the SI prefixes for the exponent on the stack
+\ so 3 -> k, -6 -> u, etc.
+\ if exponent isn't a multiple of three, it's just printed
+: si.  ( n-si_pref -- )
+dup 3 = if ." k" else
+dup 6 = if ." M" else
+dup 9 = if ." G" else
+dup 12 = if ." T" else
+dup 15 = if ." P" else
+dup 18 = if ." E" else
+dup 21 = if ." Z" else
+dup 24 = if ." Y" else
+dup -3 = if ." m" else
+dup -6 = if ." u" else
+dup -9 = if ." n" else
+dup -12 = if ." p" else
+dup -15 = if ." f" else
+dup -18 = if ." a" else
+dup -21 = if ." z" else
+dup -24 = if ." y" else
+
+dup 0 = if ." " else
+
+dup 69 emit .
+
+then then then then then
+then then then then then then
+then then then then then then drop ;
+
 \ NOW, FOR INPUT, HELPER WORDS FIRST
 
 \ COME UP WITH BETTER NAMES FOR NEXT TWO
