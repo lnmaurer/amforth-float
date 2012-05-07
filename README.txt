@@ -5,7 +5,7 @@ the check list below.
 
 This is just a personal project -- I am not involved with the development of
 amforth. However, this library has been included in amforth since version 4.2
-(along with some related libraries like assemly versions of some of the words).
+(along with some related libraries like assembly versions of some of the words).
 
 The code requires 'd=', which isn't automatically included in amforth. So
 either add it to 'dict_appl.inc' or use the code in 'float.fth'.
