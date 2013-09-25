@@ -13,20 +13,22 @@ either add it to 'dict_appl.inc' or use the code in 'float.fth'.
 Having the word 'marker' isn't strictly needed, but it can be useful. If you
 want it, add
 
-.include "words/set-current.asm"
-.include "words/set-order.asm"
+.include "dict_wl.inc"
 
-to 'dict_appl.inc' when assembling amforth. Then upload 'lib/ans94/marker.frt'.
-If you don't want to use marker, then comment it out in 'float.fth'.
+to 'dict_appl.inc' when assembling amforth. Then upload 'lib/ans94/postpone.frt'
+followed by 'lib/ans94/marker.frt'. If you don't want to use marker, then
+comment it out in 'float.fth'.
 
-Finially, if you want the ability to enter floating point numbers just like
+Finally, if you want the ability to enter floating point numbers just like
 integers, you need the recognizer to work; add
 
 .include "words/n_to_r.asm"
 .include "words/n_r_from.asm"
+.include "words/get-recognizer.asm"
+.include "words/set-recognizer.asm"
 
-to 'dict_appl_core.inc'. Then upload 'lib/ans94/postpone.frt'. If you don't
-want the recognizer, then comment the section out in 'float.fth'.
+to 'dict_appl_core.inc'. If you don't want the recognizer, then comment the
+section out in 'float.fth'.
 
 This floating point implementation is inspired by the IEEE 754-2008 binary32
 format -- your standard single precision float. I adapted their format to fit
@@ -36,7 +38,7 @@ is the sign bit, followed by a byte for the exponent, and the remaining 23
 bits for the significant. See the basics at:
 http://en.wikipedia.org/wiki/Single_precision_floating-point_format
 
-These floats are stored on the data stack -- not on their own seperate stack.
+These floats are stored on the data stack -- not on their own separate stack.
 
 ANS94 Floating-point words check list
 Words with 'yes' next to them have been implemented. 
