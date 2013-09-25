@@ -903,9 +903,7 @@ then then then then then then drop ;
   4 * ;
  
 \ WORDS TO SET UP THE RECOGNIZER
-
-\ recognizer is a feature that is available for amforth 4.3 and up
-: rec-float count >float 
+: rec-float >float 
   if
     state @ if
       postpone fliteral
