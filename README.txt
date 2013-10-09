@@ -1,34 +1,42 @@
-amforth-float -- a partially complete floating point wordset for amforth,
+amforth-float -- a mostly complete floating point wordset for amforth,
 available at <http://amforth.sourceforge.net>. The basic floating point
-wordset is mostly complete. The extension wordset is mostly incomplete. See
+wordset is almost complete. The extension wordset is mostly incomplete. See
 the check list below.
 
 This is just a personal project -- I am not involved with the development of
 amforth. However, this library has been included in amforth since version 4.2
 (along with some related libraries like assembly versions of some of the words).
 
-The code requires 'd=', which isn't automatically included in amforth. So
-either add it to 'dict_appl.inc' or use the code in 'float.fth'.
+To use this library as is, you need to include some words when assembling
+AmForth. Add the following to 'dict_appl.inc':
 
-Having the word 'marker' isn't strictly needed, but it can be useful. If you
-want it, add
-
-.include "dict_wl.inc"
-
-to 'dict_appl.inc' when assembling amforth. Then upload 'lib/ans94/postpone.frt'
-followed by 'lib/ans94/marker.frt'. If you don't want to use marker, then
-comment it out in 'float.fth'.
-
-Finally, if you want the ability to enter floating point numbers just like
-integers, you need the recognizer to work; add
-
+; needed for place-rec
 .include "words/n_to_r.asm"
 .include "words/n_r_from.asm"
+
+; for maker
+.include "dict_wl.inc"
+
+; needed for recognizer
 .include "words/get-recognizer.asm"
 .include "words/set-recognizer.asm"
 
-to 'dict_appl_core.inc'. If you don't want the recognizer, then comment the
-section out in 'float.fth'.
+; other files for amforth-float
+.include "words/d-equal.asm"
+.include "words/2r_from.asm"
+.include "words/2to_r.asm"
+
+If you really want to avoid doing this, amforth-float can be modified to work
+while still retaining much of its functionality; see previous versions of the
+readme.
+
+Once AmForth is installed on the microcontroller, upload
+
+lib/ans94/core/postpone.frt
+lib/ans94/core-ext/marker.frt
+float.fth
+
+in that order.
 
 This floating point implementation is inspired by the IEEE 754-2008 binary32
 format -- your standard single precision float. I adapted their format to fit
@@ -166,7 +174,7 @@ Other words in the library that you may find useful but aren't part of the stand
 
 There are many words in the library that are helper words and you'll probably have no use for.
 
-All the files that make up this library are copyright 2011 by Leon Maurer.
+All the files that make up this library are copyright 2013 by Leon Maurer.
 
   This program is free software; you can redistribute it and/or
   modify it under the terms of the GNU General Public License

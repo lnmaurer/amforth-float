@@ -4,19 +4,17 @@ marker ->clean
 
 \ STACK MANIPULATION WORDS
 
-\ DOESN'T WORK?
 : f>r ( f -- , R: -- f )
-    >r >r ;
+  2>r ;
 
-\ DOESN'T WORK?
 : fr> ( -- f, R: f -- )
-    r> r> ;
+  2r> ;
 
 : fdrop ( f -- )
- drop drop ;
+  drop drop ;
 
 : fdup ( f -- f f )
- over over ;
+  over over ;
 
 : fover ( f1 f2 -- f1 f2 f1 )
   >r >r
@@ -27,16 +25,16 @@ marker ->clean
   rot rot ;
   
 : fswap ( f1 f2 -- f2 f1 )
- rot >r rot r> ;
+  rot >r rot r> ;
 
 : frot ( f1 f2 f3 -- f2 f3 f1 )
- >r >r fswap r> r> fswap ;
+  >r >r fswap r> r> fswap ;
 
 : fnip ( f1 f2 -- f2 )
- fswap fdrop ;
+  fswap fdrop ;
 
 : ftuck ( f1 f2 -- f2 f1 f2 )
- fswap fover ;
+  fswap fover ;
 
 : nfswap ( f n -- n f )
   rot rot ;
@@ -93,11 +91,7 @@ true not constant false
 \ OPERATORS FOR DOUBLES
 
 : d0= ( d -- flag )
-  0= swap 0= and ;
-
-\ wasn't installed by default, so add it if you haven't included it
-: d= ( d1 d2 -- flag )
-  d- d0= ;
+  0 0  d= ;
 
 : d0< ( d -- flag )
   nip 0< ;
