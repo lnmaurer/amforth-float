@@ -1,10 +1,10 @@
-amforth-float -- a mostly complete floating point wordset for amforth,
+amforth-float -- a partly complete floating point wordset for AmForth,
 available at <http://amforth.sourceforge.net>. The basic floating point
 wordset is almost complete. The extension wordset is mostly incomplete. See
 the check list below.
 
-This is just a personal project -- I am not involved with the development of
-amforth. However, this library has been included in amforth since version 4.2
+This is a personal project -- I am not involved with the development of
+AmForth. However, this library has been included in amforth since version 4.2
 (along with some related libraries like assembly versions of some of the words).
 
 To use this library as is, you need to include some words when assembling
