@@ -83,7 +83,7 @@ true not constant false
 0 16672 fconstant f10 \ 10.0
 0 16128 fconstant f0.5
 
-\ OPERATORS FOR SIGNLES
+\ OPERATORS FOR SINGLES
 
 : >= ( n1 n2 -- f)
   over over > >r = r> or ;
